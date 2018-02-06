@@ -90,9 +90,9 @@ TPM2_NV_Read(
     out->data.t.size = in->size;
 
     // Perform the read
-    NvGetIndexData(nvIndex, locator, in->offset, in->size, out->data.t.buffer);
+    result = NvGetIndexData(nvIndex, locator, in->offset, in->size, out->data.t.buffer);
 
-    return TPM_RC_SUCCESS;
+    return result;
 }
 
 #endif // CC_NV_Read

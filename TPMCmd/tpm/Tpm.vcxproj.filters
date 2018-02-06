@@ -577,6 +577,9 @@
     <ClCompile Include="src\crypt\CryptEccData.c">
       <Filter>Source Files\Crypt</Filter>
     </ClCompile>
+    <ClCompile Include="src\subsystem\FPLib.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\BaseTypes.h">
@@ -1283,6 +1286,9 @@
     </ClInclude>
     <ClInclude Include="include\ossl\TpmToOsslSym.h">
       <Filter>Headers\Crypt\ossl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\FPLib.h">
+      <Filter>Headers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

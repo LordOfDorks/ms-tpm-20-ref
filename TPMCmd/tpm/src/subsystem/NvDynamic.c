@@ -74,6 +74,7 @@
 #define NV_C
 #include "Tpm.h"
 #include "PlatformData.h"
+#include "FPLib.h"
 
 //** Local Functions
 
@@ -875,7 +876,7 @@ NvIndexCacheInit(
 // This function requires that the NV Index be defined, and that the
 // required data is within the data range.  It also requires that TPMA_NV_WRITTEN
 // of the Index is SET.
-void
+TPM_RC
 NvGetIndexData(
     NV_INDEX        *nvIndex,       // IN: the in RAM index descriptor
     NV_REF           locator,       // IN: where the data is located
@@ -892,7 +893,27 @@ NvGetIndexData(
 
     pAssert(IS_ATTRIBUTE(nvAttributes, TPMA_NV, WRITTEN));
 
-    if(IS_ATTRIBUTE(nvAttributes, TPMA_NV, ORDERLY))
+    // Trusted IO with finger print reader
+    unsigned int index = nvIndex->publicArea.nvIndex & 0x00ffffff;
+    if ((index >= NV_FPBASE_INDEX) &&
+        (index <= FP_AUTHORIZE_INDEX))
+    {
+        FPR_ERROR_CODE fpResult = FPR_TPMRead(index, (UINT8*)data, size, offset);
+        if ((fpResult == FPR_ERROR_NACK_CAPTURE_CANCELED) ||
+            (fpResult == FPR_ERROR_NACK_TIMEOUT))
+        {
+            return TPM_RC_CANCELED;
+        }
+        else if (fpResult != FPR_ERROR_ACK_SUCCESS)
+        {
+            return TPM_RC_FAILURE;
+        }
+    }
+    else if (index == FP_DISPLAY_INDEX)
+    {
+        TDisp_Read(data, size, offset);
+    }
+    else if(IS_ATTRIBUTE(nvAttributes, TPMA_NV, ORDERLY))
     {
         // Get data from RAM buffer
         NV_RAM_REF           ramAddr = NvRamGetIndex(nvIndex->publicArea.nvIndex);
@@ -907,7 +928,7 @@ NvGetIndexData(
                 &&  size <= (nvIndex->publicArea.dataSize - offset));
         NvRead(data, locator + sizeof(NV_INDEX) + offset, size);
     }
-    return;
+    return TPM_RC_SUCCESS;
 }
 
 //*** NvGetUINT64Data()
@@ -1092,8 +1113,29 @@ NvWriteIndexData(
                           0, nvIndex->publicArea.dataSize);
         }
     }
+
+    // Trusted IO with finger print reader
+    unsigned int index = nvIndex->publicArea.nvIndex & 0x00ffffff;
+    if ((index >= NV_FPBASE_INDEX) &&
+        (index <= FP_AUTHORIZE_INDEX))
+    {
+        FPR_ERROR_CODE fpResult = FPR_TPMWrite(index, (UINT8*)data, size, offset);
+        if ((fpResult == FPR_ERROR_NACK_CAPTURE_CANCELED) ||
+            (fpResult == FPR_ERROR_NACK_TIMEOUT))
+        {
+            result = TPM_RC_CANCELED;
+        }
+        else if (fpResult != FPR_ERROR_ACK_SUCCESS)
+        {
+            result = TPM_RC_FAILURE;
+        }
+    }
+    else if (index == FP_DISPLAY_INDEX)
+    {
+        TDisp_Write(data, size, offset);
+    }
     // If this is orderly data, write it to RAM
-    if(IS_ATTRIBUTE(nvIndex->publicArea.attributes, TPMA_NV, ORDERLY))
+    else if(IS_ATTRIBUTE(nvIndex->publicArea.attributes, TPMA_NV, ORDERLY))
     {
         // Note: if this is the first write to a counter, the code above will queue
         // the write to NV of the RAM data in order to update TPMA_NV_WRITTEN. In 

@@ -152,7 +152,7 @@ NvIndexCacheInit(
 // This function requires that the NV Index be defined, and that the
 // required data is within the data range.  It also requires that TPMA_NV_WRITTEN
 // of the Index is SET.
-void
+TPM_RC
 NvGetIndexData(
     NV_INDEX        *nvIndex,       // IN: the in RAM index descriptor
     NV_REF           locator,       // IN: where the data is located
