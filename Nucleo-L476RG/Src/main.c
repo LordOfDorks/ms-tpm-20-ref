@@ -52,7 +52,10 @@
 #include "usb_device.h"
 
 /* USER CODE BEGIN Includes */
-
+#include <stdint.h>
+#include <time.h>
+#include <wolfssl/wolfcrypt/sha512.h>
+#define LIB_EXPORT
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -81,10 +84,40 @@ static void MX_USART3_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
+extern char tpmUnique[WC_SHA512_DIGEST_SIZE];
+LIB_EXPORT void _plat__Signal_PhysicalPresenceOn(void);
+LIB_EXPORT void _plat__Signal_PhysicalPresenceOff(void);
+LIB_EXPORT uint32_t _plat__GetUnique(uint32_t which, uint32_t bSize, unsigned char *b);
+typedef unsigned char DEVICE_UNIQUE_ID_T[12];
+#define DEVICE_UNIQUE_ID (*(DEVICE_UNIQUE_ID_T*)(UID_BASE))
+#define DEVICE_FLASH_SIZE (*(uint16_t *)(FLASHSIZE_BASE))
+#define DEVICE_TYPE (*(uint16_t *) (DBGMCU->IDCODE & 0x00000fff))
+#define DEVICE_REV (*(uint16_t *) (DBGMCU->IDCODE >> 16))
 
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
+void GenerateTpmUnique(void)
+{
+    wc_Sha512 hash;
+    uint8_t unique[WC_SHA512_DIGEST_SIZE] = {0};
+    if((wc_InitSha512(&hash)) ||
+       (wc_Sha512Update(&hash, DEVICE_UNIQUE_ID, sizeof(DEVICE_UNIQUE_ID))) ||
+       (wc_Sha512Update(&hash, DEVICE_FLASH_SIZE, sizeof(DEVICE_FLASH_SIZE))) ||
+       (wc_Sha512Final(&hash, tpmUnique)))
+    {
+        _Error_Handler(__FILE__, __LINE__, __func__);
+    }
+    wc_Sha512Free(&hash);
+    _plat__GetUnique(0, sizeof(unique), unique);
+    dbgPrint("tpmUnique:\r\n");
+    for(uint32_t n = 0; n < sizeof(unique); n++)
+    {
+        if((n > 0) && !(n % 16)) dbgPrint("\r\n");
+        dbgPrint("%02x", ((unsigned int)(unique[n])));
+    }
+    dbgPrint("\r\n");
+}
 
 /* USER CODE END 0 */
 
@@ -92,8 +125,9 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+    GPIO_PinState PPLast = GPIO_PIN_SET;
 
-  /* USER CODE END 1 */
+    /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
 
@@ -121,6 +155,10 @@ int main(void)
   MX_USB_DEVICE_Init();
 
   /* USER CODE BEGIN 2 */
+  dbgPrint("\r\n\r\n=========================\r\n"
+                   "= Nucleo-L476RG TPM 2.0 =\r\n"
+                   "=========================\r\n");
+  GenerateTpmUnique();
 
   /* USER CODE END 2 */
 
@@ -128,10 +166,23 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+      GPIO_PinState PPButton = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
+      if((PPButton == GPIO_PIN_RESET) && (PPLast == GPIO_PIN_SET))
+      {
+          _plat__Signal_PhysicalPresenceOn();
+          dbgPrint("Signal_PhysicalPresenceOn\r\n");
+          PPLast = PPButton;
+      }
+      else if((PPButton == GPIO_PIN_SET) && (PPLast == GPIO_PIN_RESET))
+      {
+          _plat__Signal_PhysicalPresenceOff();
+          dbgPrint("Signal_PhysicalPresenceOff\r\n");
+          PPLast = PPButton;
+      }
+
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-
   }
   /* USER CODE END 3 */
 
@@ -165,7 +216,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __func__);
   }
 
     /**Initializes the CPU, AHB and APB busses clocks 
@@ -179,7 +230,7 @@ void SystemClock_Config(void)
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __func__);
   }
 
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_USART2
@@ -199,14 +250,14 @@ void SystemClock_Config(void)
   PeriphClkInit.PLLSAI1.PLLSAI1ClockOut = RCC_PLLSAI1_48M2CLK;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __func__);
   }
 
     /**Configure the main internal regulator output voltage 
     */
   if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __func__);
   }
 
     /**Configure the Systick interrupt time 
@@ -228,7 +279,7 @@ static void MX_RNG_Init(void)
   hrng.Instance = RNG;
   if (HAL_RNG_Init(&hrng) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __FUNCTION__);
   }
 
 }
@@ -252,30 +303,30 @@ static void MX_RTC_Init(void)
   hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
   if (HAL_RTC_Init(&hrtc) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __func__);
   }
 
     /**Initialize RTC and set the Time and Date 
     */
   if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != 0x32F2){
-  sTime.Hours = 0;
-  sTime.Minutes = 0;
+  sTime.Hours = 12;
+  sTime.Minutes = 8;
   sTime.Seconds = 0;
   sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
   sTime.StoreOperation = RTC_STOREOPERATION_RESET;
   if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __func__);
   }
 
-  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
-  sDate.Month = RTC_MONTH_JANUARY;
-  sDate.Date = 1;
-  sDate.Year = 0;
+  sDate.WeekDay = RTC_WEEKDAY_FRIDAY;
+  sDate.Month = RTC_MONTH_FEBRUARY;
+  sDate.Date = 9;
+  sDate.Year = 18;
 
   if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __func__);
   }
 
     HAL_RTCEx_BKUPWrite(&hrtc,RTC_BKP_DR0,0x32F2);
@@ -304,7 +355,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
   if (HAL_SPI_Init(&hspi2) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __func__);
   }
 
 }
@@ -325,7 +376,7 @@ static void MX_USART2_UART_Init(void)
   huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
   if (HAL_UART_Init(&huart2) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __func__);
   }
 
 }
@@ -346,7 +397,7 @@ static void MX_USART3_UART_Init(void)
   huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
   if (HAL_UART_Init(&huart3) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__);
+    _Error_Handler(__FILE__, __LINE__, __func__);
   }
 
 }
@@ -396,9 +447,10 @@ static void MX_GPIO_Init(void)
   * @param  None
   * @retval None
   */
-void _Error_Handler(char * file, int line)
+void _Error_Handler(char * file, int line, const char * func)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
+  dbgPrint("PANIC: %s (%s@%d)\r\nEXECUTION HALTED.", func, file, line);
   /* User can add his own implementation to report the HAL error return state */
   while(1) 
   {

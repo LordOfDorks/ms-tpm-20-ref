@@ -49,7 +49,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32l4xx_hal.h"
 
-extern void _Error_Handler(char *, int);
+extern void _Error_Handler(char *, int, const char *);
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */

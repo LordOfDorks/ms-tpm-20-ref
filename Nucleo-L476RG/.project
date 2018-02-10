@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
 	<name>Nucleo-L476RG</name>
-	<comment />
+	<comment></comment>
 	<projects>
 	</projects>
 	<buildSpec>
@@ -15,7 +15,7 @@
 				</dictionary>
 				<dictionary>
 					<key>?name?</key>
-					<value />
+					<value></value>
 				</dictionary>
 				<dictionary>
 					<key>org.eclipse.cdt.make.core.append_environment</key>
@@ -23,7 +23,7 @@
 				</dictionary>
 				<dictionary>
 					<key>org.eclipse.cdt.make.core.buildArguments</key>
-					<value />
+					<value></value>
 				</dictionary>
 				<dictionary>
 					<key>org.eclipse.cdt.make.core.buildCommand</key>
@@ -71,6 +71,25 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
 	<linkedResources>
-		
+		<link>
+			<name>Middlewares/WolfCypt</name>
+			<type>2</type>
+			<locationURI>virtual:/virtual</locationURI>
+		</link>
+		<link>
+			<name>Middlewares/WolfCypt/sha.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/wolfssl/wolfcrypt/src/sha.c</locationURI>
+		</link>
+		<link>
+			<name>Middlewares/WolfCypt/sha256.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/wolfssl/wolfcrypt/src/sha256.c</locationURI>
+		</link>
+		<link>
+			<name>Middlewares/WolfCypt/sha512.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/wolfssl/wolfcrypt/src/sha512.c</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>

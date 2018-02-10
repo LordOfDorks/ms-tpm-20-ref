@@ -80,15 +80,20 @@
 /* #define USE_FULL_ASSERT    1U */
 
 /* USER CODE BEGIN Private defines */
+#ifndef NDEBUG
+#define dbgPrint(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__);
+#else
+#define dbgPrint(fmt, ...) ((void)0)
+#endif
 
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
  extern "C" {
 #endif
-void _Error_Handler(char *, int);
+void _Error_Handler(char *, int, const char *);
 
-#define Error_Handler() _Error_Handler(__FILE__, __LINE__)
+#define Error_Handler() _Error_Handler(__FILE__, __LINE__, __FUNCTION__)
 #ifdef __cplusplus
 }
 #endif
