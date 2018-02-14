@@ -190,11 +190,11 @@ int main(void)
   MX_USB_DEVICE_Init();
 
   /* USER CODE BEGIN 2 */
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
   dbgPrint("\r\n\r\n=========================\r\n"
                    "= Nucleo-L476RG TPM 2.0 =\r\n"
                    "=========================\r\n");
   GenerateTpmUnique();
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /* USER CODE END 2 */
 
@@ -202,6 +202,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+      // Device reset
       if(resetRequested)
       {
           dbgPrint("Executing reset...\r\n");
@@ -209,6 +210,7 @@ int main(void)
           NVIC_SystemReset();
       }
 
+      // Physical presence button (blue button on the Nucleo)
       GPIO_PinState PPButton = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
       if((PPButton == GPIO_PIN_RESET) && (PPLast == GPIO_PIN_SET))
       {
@@ -223,6 +225,7 @@ int main(void)
           PPLast = PPButton;
       }
 
+      // Command processing
       if(cmdRspSize > 0)
       {
           unsigned int rspSize = sizeof(cmdRspBuf) - sizeof(unsigned int);

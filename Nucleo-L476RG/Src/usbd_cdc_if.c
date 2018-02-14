@@ -280,6 +280,7 @@ static int8_t CDC_Control_FS  (uint8_t cmd, uint8_t* pbuf, uint16_t length)
       CDC_RTS = ((setupPkt->wVal & CDC_RTS_MASK) != 0);
       CDC_DTR = ((setupPkt->wVal & CDC_DTR_MASK) != 0);
       dbgPrint("CDC_SET_CONTROL_LINE_STATE: RTS=%d, DTR=%d\r\n", CDC_RTS, CDC_DTR);
+      // Reset any ongoing cmd transfers
       receivingCmd = -1;
       receivingCursor = -1;
       cmdRspSize = -1;
@@ -478,6 +479,7 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
     return USBD_BUSY;
   }
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Buf, Len);
+  dbgPrint("ResponseData(%d)\r\n", Len);
   result = USBD_CDC_TransmitPacket(&hUsbDeviceFS);
   /* USER CODE END 7 */ 
   return result;

@@ -44,23 +44,186 @@
 #include <memory.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
+#include <wolfssl/wolfcrypt/sha512.h>
+#undef INLINE
+#include "stm32l4xx_hal.h"
 #include "PlatformData.h"
 #include "Platform_fp.h"
 
-//**Functions
+#define NVINTEGRITYMAGIC (0x44494E54) // TNID - TPM NV Integrity Data
+typedef union
+{
+    struct
+    {
+        struct
+        {
+            uint32_t magic;
+            time_t created;
+            time_t lastWrite;
+            uint32_t writeCount;
+            uint8_t nvDigest[WC_SHA512_DIGEST_SIZE];
+        } sig;
+        uint8_t nvSignature[WC_SHA512_DIGEST_SIZE];
+    } s;
+    unsigned char b[0x800];
+    unsigned int w[0x200];
+} IntegrityData_t, *pIntegrityData_t;
 
+__attribute__((section(".integrity"))) const IntegrityData_t nvIntegrity;
+__attribute__((section(".nvfile"))) const uint8_t nvFile[NV_MEMORY_SIZE];
+
+//**Functions
+static BOOL NvHash2Data(uint8_t* data1, uint32_t data1Size, uint8_t* data2, uint32_t data2Size, uint8_t* digest)
+{
+    wc_Sha512 hash;
+    if(wc_InitSha512(&hash))
+    {
+        dbgPrint("ERROR wc_InitSha512() failed.\r\n");
+        return FALSE;
+    }
+    else if(data1 && (data1Size > 0) && wc_Sha512Update(&hash, data1, data1Size))
+    {
+        dbgPrint("ERROR wc_Sha512Update() failed.\r\n");
+        return FALSE;
+    }
+    else if(data2 && (data2Size > 0) && wc_Sha512Update(&hash, data2, data2Size))
+    {
+        dbgPrint("ERROR wc_Sha512Update() failed.\r\n");
+        return FALSE;
+    }
+    else if(wc_Sha512Final(&hash, (byte*)digest))
+    {
+        dbgPrint("ERROR wc_Sha512Final failed.\r\n");
+        return FALSE;
+    }
+    wc_Sha512Free(&hash);
+    return TRUE;
+}
+
+static BOOL NvErasePages(void* dest, uint32_t size)
+{
+    BOOL result = TRUE;
+    uint32_t pageError = 0;
+    FLASH_EraseInitTypeDef eraseInfo = {FLASH_TYPEERASE_PAGES,
+                                        FLASH_BANK_1,
+                                        ((uint32_t)dest - 0x08000000) / 0x800,
+                                        (size + 0x7ff) / 0x800};
+
+    // Open the memory protection
+    for(uint32_t m = 0; m < 10; m++)
+    {
+        if((result = (HAL_FLASH_Unlock() == HAL_OK)) != FALSE)
+        {
+            break;
+        }
+        dbgPrint("WARNING HAL_FLASH_Unlock() retry %u.\r\n", (unsigned int)m);
+        // Bring the flash subsystem into a defined state.
+        HAL_FLASH_Lock();
+        HAL_Delay(1);
+    }
+    if(!result)
+    {
+        dbgPrint("ERROR HAL_FLASH_Unlock() failed.\r\n");
+        goto Cleanup;
+    }
+
+    // Erase the necessary pages
+    for(uint32_t m = 0; m < 10; m++)
+    {
+        if((result = ((HAL_FLASHEx_Erase(&eraseInfo, &pageError) == HAL_OK) && (pageError == 0xffffffff))))
+        {
+            break;
+        }
+        dbgPrint("WARNING HAL_FLASHEx_Erase() retry %u.\r\n", (unsigned int)m);
+    }
+    if(!result)
+    {
+        dbgPrint("ERROR HAL_FLASHEx_Erase() failed.\r\n");
+        goto Cleanup;
+    }
+
+Cleanup:
+    HAL_FLASH_Lock();
+    return result;
+}
+
+static BOOL NvFlashPages(void* dest, void* src, uint32_t size)
+{
+    BOOL result = TRUE;
+
+    // Parameter check
+    if(!(result = ((((uint32_t)src % sizeof(uint32_t)) == 0))))
+    {
+        goto Cleanup;
+    }
+
+    // Erase the required area
+    if(!(result = NvErasePages(dest, size)))
+    {
+        goto Cleanup;
+    }
+
+    // Open the memory protection
+    if(!(result = (HAL_FLASH_Unlock() == HAL_OK)))
+    {
+        goto Cleanup;
+    }
+
+    // Flash the src buffer 8 byte at a time and verify
+    for(uint32_t n = 0; n < ((size + sizeof(uint64_t) - 1) / sizeof(uint64_t)); n++)
+    {
+        result = FALSE;
+        for(uint32_t m = 0; m < 10; m++)
+        {
+            uint32_t progPtr = (uint32_t)&(((uint64_t*)dest)[n]);
+            uint64_t progData = ((uint64_t*)src)[n];
+            if((progData == *((uint64_t*)progPtr)) ||
+               ((result = (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, progPtr, progData) == HAL_OK)) &&
+                (progData == *((uint64_t*)progPtr))))
+            {
+                result = TRUE;
+                break;
+            }
+            dbgPrint("WARNING HAL_FLASH_Program() retry %u.\r\n", (unsigned int)m);
+        }
+        if(result == FALSE)
+        {
+            dbgPrint("ERROR HAL_FLASH_Program() failed.\r\n");
+            goto Cleanup;
+        }
+    }
+
+Cleanup:
+    HAL_FLASH_Lock();
+    return result;
+}
+
+char* NvMakeTimeStamp(time_t time, char* nvTimeStamp, uint32_t size)
+{
+    struct tm* timeInfo = NULL;
+    timeInfo = gmtime(&time);
+    snprintf(nvTimeStamp, size, "%04d.%02d.%02d-%02d:%02d:%02dGMT",
+                                 timeInfo->tm_year + 1900,
+                                 timeInfo->tm_mon + 1,
+                                 timeInfo->tm_mday,
+                                 timeInfo->tm_hour,
+                                 timeInfo->tm_min,
+                                 timeInfo->tm_sec);
+    return nvTimeStamp;
+}
 //*** _plat__NvErrors()
 // This function is used by the simulator to set the error flags in the NV
 // subsystem to simulate an error in the NV loading process
-LIB_EXPORT void
-_plat__NvErrors(
-    int              recoverable,
-    int            unrecoverable
-    )
-{
-    s_NV_unrecoverable = unrecoverable;
-    s_NV_recoverable = recoverable;
-}
+//LIB_EXPORT void
+//_plat__NvErrors(
+//    int              recoverable,
+//    int            unrecoverable
+//    )
+//{
+//    s_NV_unrecoverable = unrecoverable;
+//    s_NV_recoverable = recoverable;
+//}
 
 //***_plat__NVEnable()
 // Enable NV memory.
@@ -83,66 +246,96 @@ _plat__NVEnable(
     )
 {
     NOT_REFERENCED(platParameter);          // to keep compiler quiet
+    BOOL result = TRUE;
+    uint8_t tpmUnique[WC_SHA512_DIGEST_SIZE];
+    uint8_t tpmUniqueSize = 0;
+    tpmUniqueSize = _plat__GetUnique(0, sizeof(tpmUnique), tpmUnique);
+
     // Start assuming everything is OK
     s_NV_unrecoverable = FALSE;
     s_NV_recoverable = FALSE;
+    memcpy(s_NV, nvFile, sizeof(s_NV));
 
-#ifdef FILE_BACKED_NV
-
-    if(s_NVFile != NULL) 
-        return 0;
-
-    // Try to open an exist NVChip file for read/write
-#if defined _MSC_VER && 1
-    if(0 != fopen_s(&s_NVFile, "NVChip", "r+b"))
-        s_NVFile = NULL;
-#else
-    s_NVFile = fopen("NVChip", "r+b");
-#endif
-
-    
-
-    if(NULL != s_NVFile)
+    // Perform integrity verification
+    if(nvIntegrity.s.sig.magic != NVINTEGRITYMAGIC)
     {
-        // See if the NVChip file is empty
-        fseek(s_NVFile, 0, SEEK_END);
-        if(0 == ftell(s_NVFile))
-            s_NVFile = NULL;
-    }
+        // Initialize NV
+        IntegrityData_t newIntegrity = {0};
 
-    if(s_NVFile == NULL)
-    {
-        // Initialize all the byte in the new file to 0
-        memset(s_NV, 0, NV_MEMORY_SIZE);
-
-        // If NVChip file does not exist, try to create it for read/write
-#if defined _MSC_VER && 1
-        if(0 != fopen_s(&s_NVFile, "NVChip", "w+b"))
-            s_NVFile = NULL;
-#else
-        s_NVFile = fopen("NVChip", "w+b");
-#endif
-        if(s_NVFile != NULL)
+        if((result = NvErasePages((uint8_t*)&nvIntegrity, sizeof(nvIntegrity))) == FALSE)
         {
-        // Start initialize at the end of new file
-            fseek(s_NVFile, 0, SEEK_END);
-            // Write 0s to NVChip file
-            fwrite(s_NV, 1, NV_MEMORY_SIZE, s_NVFile);
+            dbgPrint("ERROR NvErasePages(nvIntegrity) failed.\r\n");
+            s_NV_unrecoverable = TRUE;
+            goto Cleanup;
         }
+        if((result = NvErasePages((uint8_t*)nvFile, sizeof(nvFile))) == FALSE)
+        {
+            dbgPrint("ERROR NvErasePages(nvFile) failed.\r\n");
+            s_NV_unrecoverable = TRUE;
+            goto Cleanup;
+        }
+
+        newIntegrity.s.sig.magic = NVINTEGRITYMAGIC;
+        newIntegrity.s.sig.created = time(NULL);
+        if((result = NvHash2Data((uint8_t*)nvFile, sizeof(nvFile), NULL, 0, newIntegrity.s.sig.nvDigest)) == FALSE)
+        {
+            dbgPrint("WARNING NvHash2Data(nvFile) failed.\r\n");
+            s_NV_recoverable = TRUE;
+            goto Cleanup;
+        }
+        if((result = NvHash2Data(tpmUnique, tpmUniqueSize, (uint8_t*)&newIntegrity.s.sig, sizeof(newIntegrity.s.sig), newIntegrity.s.nvSignature)) == FALSE)
+        {
+            dbgPrint("WARNING NvHash2Data(tpmUnique, newIntegrity) failed.\r\n");
+            s_NV_recoverable = TRUE;
+            goto Cleanup;
+        }
+        if((result = NvFlashPages((uint8_t*)&nvIntegrity, (uint8_t*)&newIntegrity, sizeof(newIntegrity))) == FALSE)
+        {
+            dbgPrint("ERROR NvFlashPages(nvIntegrity) failed.\r\n");
+            s_NV_unrecoverable = TRUE;
+            goto Cleanup;
+        }
+        dbgPrint("Initialized %dkb NVFile.\r\n", sizeof(nvFile)/1024);
+        memcpy(s_NV, nvFile, sizeof(s_NV));
     }
     else
     {
-        // If NVChip file exist, assume the size is correct
-        fseek(s_NVFile, 0, SEEK_END);
-        assert(ftell(s_NVFile) == NV_MEMORY_SIZE);
-        // read NV file data to memory
-        fseek(s_NVFile, 0, SEEK_SET);
-        fread(s_NV, NV_MEMORY_SIZE, 1, s_NVFile);
+        uint8_t nvDigest[WC_SHA512_DIGEST_SIZE];
+        if((result = NvHash2Data(tpmUnique, tpmUniqueSize, (uint8_t*)&nvIntegrity.s.sig, sizeof(nvIntegrity.s.sig), nvDigest)) == FALSE)
+        {
+            dbgPrint("WARNING NvHash2Data(tpmUnique, nvIntegrity) failed.\r\n");
+            s_NV_recoverable = TRUE;
+            goto Cleanup;
+        }
+        if(memcmp(nvDigest, nvIntegrity.s.nvSignature, sizeof(nvDigest)))
+        {
+            dbgPrint("WARNING NV signature invalid.\r\n");
+            s_NV_recoverable = TRUE;
+            goto Cleanup;
+        }
+        if((result = NvHash2Data((uint8_t*)nvFile, sizeof(nvFile), NULL, 0, nvDigest)) == FALSE)
+        {
+            dbgPrint("WARNING NvHash2Data(nvFile) filed.\r\n");
+            s_NV_recoverable = TRUE;
+            goto Cleanup;
+        }
+        if(memcmp(nvDigest, nvIntegrity.s.sig.nvDigest, sizeof(nvDigest)))
+        {
+            dbgPrint("WARNING NV integrity measurement invalid.\r\n");
+            s_NV_recoverable = TRUE;
+            goto Cleanup;
+        }
     }
-#endif
-    // NV contents have been read and the error checks have been performed. For
-    // simulation purposes, use the signaling interface to indicate if an error is
-    // to be simulated and the type of the error.
+    char created[50];
+    char written[50];
+    dbgPrint("NVFile loaded (%dkb, %s created, %d writes, %s last)\r\n",
+             sizeof(nvFile)/1024,
+             NvMakeTimeStamp(nvIntegrity.s.sig.created, created, sizeof(created)),
+             (int)nvIntegrity.s.sig.writeCount,
+             (nvIntegrity.s.sig.lastWrite) ? NvMakeTimeStamp(nvIntegrity.s.sig.lastWrite, written, sizeof(written)) : "NEVER");
+
+Cleanup:
+    HAL_FLASH_Lock();
     if(s_NV_unrecoverable)
         return -1;
     return s_NV_recoverable;
@@ -155,16 +348,6 @@ _plat__NVDisable(
     void
     )
 {
-#ifdef  FILE_BACKED_NV
-
-    assert(s_NVFile != NULL);
-    // Close NV file
-    fclose(s_NVFile);
-    // Set file handle to NULL
-    s_NVFile = NULL;
-
-#endif
-
     return;
 }
 
@@ -182,11 +365,6 @@ _plat__IsNvAvailable(
     // NV is not available if the TPM is in failure mode
     if(!s_NvIsAvailable)
         return 1;
-
-#ifdef FILE_BACKED_NV
-    if(s_NVFile == NULL)
-        return 1;
-#endif
 
     return 0;
 }
@@ -288,18 +466,70 @@ _plat__NvCommit(
     void
     )
 {
-#ifdef FILE_BACKED_NV
-    // If NV file is not available, return failure
-    if(s_NVFile == NULL)
-        return 1;
+    BOOL result = TRUE;
+    char created[50];
+    char written[50];
+    IntegrityData_t newIntegrity = {0};
+    uint8_t tpmUnique[WC_SHA512_DIGEST_SIZE];
+    uint8_t tpmUniqueSize = 0;
 
-    // Write RAM data to NV
-    fseek(s_NVFile, 0, SEEK_SET);
-    fwrite(s_NV, 1, NV_MEMORY_SIZE, s_NVFile);
-    return 0;
-#else
-    return 0;
-#endif
+    tpmUniqueSize = _plat__GetUnique(0, sizeof(tpmUnique), tpmUnique);
+    memcpy(&newIntegrity, &nvIntegrity, sizeof(newIntegrity));
+
+    if((result = NvHash2Data(s_NV, sizeof(s_NV), NULL, 0, newIntegrity.s.sig.nvDigest)) == FALSE)
+    {
+        dbgPrint("WARNING NvHash2Data(s_NV) failed.\r\n");
+        result = FALSE;
+        goto Cleanup;
+    }
+    if((result = NvHash2Data(tpmUnique, tpmUniqueSize, (uint8_t*)&nvIntegrity.s.sig, sizeof(nvIntegrity.s.sig), newIntegrity.s.nvSignature)) == FALSE)
+    {
+        dbgPrint("WARNING NvHash2Data(tpmUnique, nvIntegrity) failed.\r\n");
+        result = FALSE;
+        goto Cleanup;
+    }
+
+    if((memcmp(newIntegrity.s.sig.nvDigest, nvIntegrity.s.sig.nvDigest, sizeof(newIntegrity.s.sig.nvDigest))) ||
+       (memcmp(newIntegrity.s.nvSignature, nvIntegrity.s.nvSignature, sizeof(newIntegrity.s.nvSignature))))
+    {
+        newIntegrity.s.sig.lastWrite = time(NULL);
+        newIntegrity.s.sig.writeCount++;
+        if((result = NvHash2Data(tpmUnique, tpmUniqueSize, (uint8_t*)&newIntegrity.s.sig, sizeof(newIntegrity.s.sig), newIntegrity.s.nvSignature)) == FALSE)
+        {
+            dbgPrint("WARNING NvHash2Data(tpmUnique, newIntegrity) failed.\r\n");
+            result = FALSE;
+            goto Cleanup;
+        }
+        if((result = NvFlashPages((uint8_t*)nvFile, s_NV, sizeof(s_NV))) == FALSE)
+        {
+            dbgPrint("ERROR NvFlashPages(nvFile) failed.\r\n");
+            result = FALSE;
+            goto Cleanup;
+        }
+        if((result = NvFlashPages((uint8_t*)&nvIntegrity, (uint8_t*)&newIntegrity, sizeof(newIntegrity))) == FALSE)
+        {
+            dbgPrint("ERROR NvFlashPages(nvIntegrity) failed.\r\n");
+            result = FALSE;
+            goto Cleanup;
+        }
+        dbgPrint("NVFile written (%dkb, %s created, %d writes, %s last)\r\n",
+                 sizeof(nvFile)/1024,
+                 NvMakeTimeStamp(nvIntegrity.s.sig.created, created, sizeof(created)),
+                 (int)nvIntegrity.s.sig.writeCount,
+                 (nvIntegrity.s.sig.lastWrite) ? NvMakeTimeStamp(nvIntegrity.s.sig.lastWrite, written, sizeof(written)) : "NEVER");
+    }
+    else
+    {
+        dbgPrint("NVFile unchanged (%dkb, %s created, %d writes, %s last)\r\n",
+                 sizeof(nvFile)/1024,
+                 NvMakeTimeStamp(nvIntegrity.s.sig.created, created, sizeof(created)),
+                 (int)nvIntegrity.s.sig.writeCount,
+                 (nvIntegrity.s.sig.lastWrite) ? NvMakeTimeStamp(nvIntegrity.s.sig.lastWrite, written, sizeof(written)) : "NEVER");
+    }
+
+
+Cleanup:
+    return (result != TRUE);
 }
 
 //***_plat__SetNvAvail()

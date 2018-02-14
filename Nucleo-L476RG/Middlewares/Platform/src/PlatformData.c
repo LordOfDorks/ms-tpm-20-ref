@@ -67,16 +67,10 @@ uint32_t             lastEntropy;
 int                  firstValue;
 
 // From NVMem.c
-#ifdef  VTPM
-#   undef FILE_BACKED_NV
-#endif
-#ifdef FILE_BACKED_NV
-FILE                *s_NVFile = NULL;
-#endif
 unsigned char        s_NV[NV_MEMORY_SIZE];
 BOOL                 s_NvIsAvailable;
 BOOL                 s_NV_unrecoverable;
 BOOL                 s_NV_recoverable;
 
 // From PPPlat.c
-BOOL  s_physicalPresence;
+BOOL                 s_physicalPresence;

@@ -40,9 +40,11 @@ _Min_Stack_Size = 0x4000; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 96K
+RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 96K
 RAM2 (xrw)      : ORIGIN = 0x10000000, LENGTH = 32K
-FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 1024K
+FLASH (rx)      : ORIGIN = 0x8000000,  LENGTH = 1006K
+INTEGRITY (rx)  : ORIGIN = 0x80FB800,  LENGTH = 2K
+NVFILE (rx)     : ORIGIN = 0x80FC000,  LENGTH = 16K
 }
 
 /* Define output sections */
@@ -82,6 +84,22 @@ SECTIONS
     . = ALIGN(4);
   } >FLASH
 
+  .integrity (NOLOAD):
+  {
+    . = ALIGN(4);
+    *(.integrity)         /* .integrity internal integrity protection of NVFile */
+    *(.integrity*)        /* .integrity* internal integrity protection of NVFile */
+    . = ALIGN(4);
+  } >INTEGRITY
+  
+  .nvfile (NOLOAD):
+  {
+    . = ALIGN(4);
+    *(.nvfile)         /* .nvfile persisted NV storage for the TPM */
+    *(.nvfile*)        /* .nvfile* persisted NV storage for the TPM */
+    . = ALIGN(4);
+  } >NVFILE
+  
   .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >FLASH
   .ARM : {
     __exidx_start = .;

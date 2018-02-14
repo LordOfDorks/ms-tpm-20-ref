@@ -226,6 +226,9 @@
 							<tool id="com.atollic.truestudio.exe.debug.toolchain.secoutput.533367214" name="Other" superClass="com.atollic.truestudio.exe.debug.toolchain.secoutput.839033486"/>
 						</toolChain>
 					</folderInfo>
+					<fileInfo id="com.atollic.truestudio.exe.debug.1518366166.1802990937" name="hmac.c" rcbsApplicability="disable" resourcePath="Middlewares/WolfCypt/hmac.c" toolsToInvoke="com.atollic.truestudio.exe.debug.toolchain.gcc.533114787.1796116275">
+						<tool id="com.atollic.truestudio.exe.debug.toolchain.gcc.533114787.1796116275" name="C Compiler" superClass="com.atollic.truestudio.exe.debug.toolchain.gcc.533114787"/>
+					</fileInfo>
 					<sourceEntries>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="startup"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Middlewares"/>
