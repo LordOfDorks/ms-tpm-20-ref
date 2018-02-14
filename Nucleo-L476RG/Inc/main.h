@@ -81,10 +81,69 @@
 
 /* USER CODE BEGIN Private defines */
 #ifndef NDEBUG
-#define dbgPrint(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__);
+#define dbgPrint(fmt, ...) fprintf(stderr, "%s: " fmt, GetLogStamp(), ##__VA_ARGS__);
 #else
 #define dbgPrint(fmt, ...) ((void)0)
 #endif
+
+#define SIGNALMAGIC (0x326d7054)
+#define MAX_TPM_COMMAND_SIZE (1024)
+#define CMD_RSP_BUFFER_SIZE (sizeof(unsigned int) + MAX_TPM_COMMAND_SIZE)
+typedef enum
+{
+    SignalNothing = 0,
+    SignalReset,
+    SignalSetClock,
+        // IN {UINT32 time}
+    SignalCancelOn,
+    SignalCancelOff,
+    SignalCommand,
+        // IN {BYTE Locality, UINT32 InBufferSize, BYTE[InBufferSize] InBuffer}
+        // OUT {UINT32 OutBufferSize, BYTE[OutBufferSize] OutBuffer}
+
+} signalCode_t;
+
+typedef struct
+{
+    unsigned int magic;
+    signalCode_t signal;
+    unsigned int dataSize;
+} signalHdr_t;
+
+typedef union
+{
+    struct
+    {
+        unsigned int time;
+    } SignalSetClockPayload;
+    struct
+    {
+        unsigned int locality;
+        unsigned int cmdSize;
+        unsigned char cmd[1];
+    } SignalCommandPayload;
+} signalPayload_t, *pSignalPayload_t;
+
+typedef union
+{
+    signalHdr_t s;
+    unsigned char b[sizeof(signalHdr_t)];
+} signalWrapper_t, *pSignalWrapper_t;
+
+extern volatile unsigned char resetRequested;
+extern char logStampStr[40];
+extern volatile int cmdRspSize;
+extern volatile int receivingCmd;
+extern volatile int receivingCursor;
+extern volatile unsigned char cmdRspBuf[CMD_RSP_BUFFER_SIZE];
+
+void _plat__Signal_PhysicalPresenceOn(void);
+void _plat__Signal_PhysicalPresenceOff(void);
+void _plat__SetCancel(void);
+void _plat__ClearCancel(void);
+void _plat__LocalitySet(unsigned char locality);
+void _plat__RunCommand(unsigned int requestSize, unsigned char *request, unsigned int *responseSize, unsigned char **response);
+char* GetLogStamp(void);
 
 /* USER CODE END Private defines */
 

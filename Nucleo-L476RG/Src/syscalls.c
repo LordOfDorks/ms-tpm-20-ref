@@ -84,36 +84,36 @@ int _getpid(void)
 
 int _gettimeofday(struct timeval  *ptimeval, void *ptimezone)
 {
-	if(ptimezone)
-	{
-		struct timezone* tz = ptimezone;
-		tz->tz_minuteswest = _timezone / 60;
-		tz->tz_dsttime = _daylight;
-	}
+    if(ptimezone)
+    {
+        struct timezone* tz = ptimezone;
+        tz->tz_minuteswest = _timezone / 60;
+        tz->tz_dsttime = _daylight;
+    }
 
-	if(ptimeval)
-	{
-		RTC_TimeTypeDef time = {0};
-		RTC_DateTypeDef date = {0};
+    if(ptimeval)
+    {
+        RTC_TimeTypeDef time = {0};
+        RTC_DateTypeDef date = {0};
 
-		if((HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN) != HAL_OK) ||
-		   (HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN) != HAL_OK))
-		{
-			errno = ENOSYS;
-			return -1;
-		}
+        if((HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN) != HAL_OK) ||
+           (HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN) != HAL_OK))
+        {
+            errno = ENOSYS;
+            return -1;
+        }
 
-	    struct tm local = {0};
-	    local.tm_year = date.Year + 100;
-	    local.tm_mon = date.Month - 1;
-	    local.tm_mday = date.Date;
-	    local.tm_wday = date.WeekDay - 1;
-	    local.tm_hour = time.Hours;
-	    local.tm_min = time.Minutes;
-	    local.tm_sec = time.Seconds;
-	    ptimeval->tv_sec = mktime(&local);
-	    ptimeval->tv_usec = (time.SecondFraction * 1000 * 1000 / time.SubSeconds);
-	}
+        struct tm local = {0};
+        local.tm_year = date.Year + 100;
+        local.tm_mon = date.Month - 1;
+        local.tm_mday = date.Date;
+        local.tm_wday = date.WeekDay - 1;
+        local.tm_hour = time.Hours;
+        local.tm_min = time.Minutes;
+        local.tm_sec = time.Seconds;
+        ptimeval->tv_sec = mktime(&local);
+        ptimeval->tv_usec = (time.SecondFraction * 1000 * 1000 / time.SubSeconds);
+    }
 
   return 0;
 }

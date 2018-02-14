@@ -67,9 +67,9 @@ jmp_buf s_jumpBuffer;
 // a failure response and return.
 LIB_EXPORT void
 _plat__RunCommand(
-    uint32_t         requestSize,   // IN: command buffer size
+    unsigned int     requestSize,   // IN: command buffer size
     unsigned char   *request,       // IN: command buffer
-    uint32_t        *responseSize,  // IN/OUT: response buffer size
+    unsigned int    *responseSize,  // IN/OUT: response buffer size
     unsigned char   **response      // IN/OUT: response buffer
     )
 {

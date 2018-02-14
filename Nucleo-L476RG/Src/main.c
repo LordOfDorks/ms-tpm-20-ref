@@ -56,15 +56,14 @@
 #include <time.h>
 #include <wolfssl/wolfcrypt/sha512.h>
 #define LIB_EXPORT
+
+volatile unsigned char* cmdQueue[4] = {0};
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
 RNG_HandleTypeDef hrng;
-
 RTC_HandleTypeDef hrtc;
-
 SPI_HandleTypeDef hspi2;
-
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
@@ -85,14 +84,19 @@ static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 extern char tpmUnique[WC_SHA512_DIGEST_SIZE];
-LIB_EXPORT void _plat__Signal_PhysicalPresenceOn(void);
-LIB_EXPORT void _plat__Signal_PhysicalPresenceOff(void);
-LIB_EXPORT uint32_t _plat__GetUnique(uint32_t which, uint32_t bSize, unsigned char *b);
+uint32_t _plat__GetUnique(uint32_t which, uint32_t bSize, unsigned char *b);
+uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 typedef unsigned char DEVICE_UNIQUE_ID_T[12];
 #define DEVICE_UNIQUE_ID (*(DEVICE_UNIQUE_ID_T*)(UID_BASE))
 #define DEVICE_FLASH_SIZE (*(uint16_t *)(FLASHSIZE_BASE))
 #define DEVICE_TYPE (*(uint16_t *) (DBGMCU->IDCODE & 0x00000fff))
 #define DEVICE_REV (*(uint16_t *) (DBGMCU->IDCODE >> 16))
+volatile int cmdRspSize = -1;
+volatile int receivingCmd = -1;
+volatile int receivingCursor = -1;
+volatile unsigned char cmdRspBuf[CMD_RSP_BUFFER_SIZE] = {0};
+volatile unsigned char resetRequested = 0;
+char logStampStr[40] = {0};
 
 /* USER CODE END PFP */
 
@@ -100,23 +104,54 @@ typedef unsigned char DEVICE_UNIQUE_ID_T[12];
 void GenerateTpmUnique(void)
 {
     wc_Sha512 hash;
+    char uniqueStr[160] = {0};
+    unsigned int cursor = 0;
     uint8_t unique[WC_SHA512_DIGEST_SIZE] = {0};
     if((wc_InitSha512(&hash)) ||
        (wc_Sha512Update(&hash, DEVICE_UNIQUE_ID, sizeof(DEVICE_UNIQUE_ID))) ||
-       (wc_Sha512Update(&hash, DEVICE_FLASH_SIZE, sizeof(DEVICE_FLASH_SIZE))) ||
-       (wc_Sha512Final(&hash, tpmUnique)))
+       (wc_Sha512Final(&hash, (byte*)tpmUnique)))
     {
         _Error_Handler(__FILE__, __LINE__, __func__);
     }
     wc_Sha512Free(&hash);
     _plat__GetUnique(0, sizeof(unique), unique);
-    dbgPrint("tpmUnique:\r\n");
+#ifndef NDEBUG
     for(uint32_t n = 0; n < sizeof(unique); n++)
     {
-        if((n > 0) && !(n % 16)) dbgPrint("\r\n");
-        dbgPrint("%02x", ((unsigned int)(unique[n])));
+        if(!(n % 16)) cursor += sprintf(&uniqueStr[cursor],"\r\n    ");
+        cursor += sprintf(&uniqueStr[cursor], "%02x", ((unsigned int)(unique[n])));
     }
-    dbgPrint("\r\n");
+    dbgPrint("Generated tpmUnique%s\r\n", uniqueStr);
+#endif
+}
+
+char* GetLogStamp(void)
+{
+    RTC_TimeTypeDef time = {0};
+    RTC_DateTypeDef date = {0};
+    HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
+
+    sprintf(logStampStr, "%04d.%02d.%02d-%02d:%02d:%02d.%03dGMT",
+                date.Year + 2000,
+                date.Month,
+                date.Date,
+                time.Hours,
+                time.Minutes,
+                time.Seconds,
+                (int)((1000 / time.SecondFraction) * (time.SecondFraction - time.SubSeconds)));
+    return logStampStr;
+}
+
+void ExecuteCommand(
+    uint32_t         requestSize,   // IN: command buffer size
+    unsigned char   *request,       // IN: command buffer
+    uint32_t        *responseSize,  // IN/OUT: response buffer size
+    unsigned char   **response      // IN/OUT: response buffer
+    )
+{
+    *responseSize = MIN(requestSize, *responseSize);
+    memcpy(*response, request, *responseSize);
 }
 
 /* USER CODE END 0 */
@@ -159,6 +194,7 @@ int main(void)
                    "= Nucleo-L476RG TPM 2.0 =\r\n"
                    "=========================\r\n");
   GenerateTpmUnique();
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /* USER CODE END 2 */
 
@@ -166,18 +202,43 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+      if(resetRequested)
+      {
+          dbgPrint("Executing reset...\r\n");
+          HAL_Delay(1);
+          NVIC_SystemReset();
+      }
+
       GPIO_PinState PPButton = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
       if((PPButton == GPIO_PIN_RESET) && (PPLast == GPIO_PIN_SET))
       {
           _plat__Signal_PhysicalPresenceOn();
-          dbgPrint("Signal_PhysicalPresenceOn\r\n");
+          dbgPrint("Executing PhysicalPresenceOn.\r\n");
           PPLast = PPButton;
       }
       else if((PPButton == GPIO_PIN_SET) && (PPLast == GPIO_PIN_RESET))
       {
           _plat__Signal_PhysicalPresenceOff();
-          dbgPrint("Signal_PhysicalPresenceOff\r\n");
+          dbgPrint("Executing PhysicalPresenceOff.\r\n");
           PPLast = PPButton;
+      }
+
+      if(cmdRspSize > 0)
+      {
+          unsigned int rspSize = sizeof(cmdRspBuf) - sizeof(unsigned int);
+          unsigned char* rspBuf = (unsigned char*)&cmdRspBuf[sizeof(unsigned int)];
+          dbgPrint("Executing command (%d).\r\n", cmdRspSize);
+          HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+          _plat__RunCommand((unsigned int)cmdRspSize, (unsigned char*)cmdRspBuf, &rspSize, &rspBuf);
+          HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+          dbgPrint("Returned response (%d).\r\n", rspSize);
+          *((unsigned int*)cmdRspBuf) = rspSize;
+          cmdRspSize = sizeof(unsigned int) + rspSize;
+          CDC_Transmit_FS((unsigned char*)cmdRspBuf, (unsigned int)cmdRspSize);
+          dbgPrint("SetLocality(0)\r\n");
+          _plat__LocalitySet(0);
+          memset((unsigned char*)cmdRspBuf, 0x00, sizeof(cmdRspBuf));
+          cmdRspSize = -1;
       }
 
   /* USER CODE END WHILE */
