@@ -83,6 +83,11 @@ void MX_USB_DEVICE_Init(void)
 
 }
 
+void MX_USB_DEVICE_DeInit(void)
+{
+    USBD_DeInit(&hUsbDeviceFS);
+}
+
 /**
   * @brief  HAL_PCDEx_BCD_Callback : Send BCD message to user layer
   * @param  hpcd: PCD handle

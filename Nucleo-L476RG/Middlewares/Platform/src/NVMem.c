@@ -245,7 +245,6 @@ _plat__NVEnable(
     void            *platParameter  // IN: platform specific parameters
     )
 {
-    NOT_REFERENCED(platParameter);          // to keep compiler quiet
     BOOL result = TRUE;
     uint8_t tpmUnique[WC_SHA512_DIGEST_SIZE];
     uint8_t tpmUniqueSize = 0;
@@ -257,7 +256,7 @@ _plat__NVEnable(
     memcpy(s_NV, nvFile, sizeof(s_NV));
 
     // Perform integrity verification
-    if(nvIntegrity.s.sig.magic != NVINTEGRITYMAGIC)
+    if((nvIntegrity.s.sig.magic != NVINTEGRITYMAGIC) || (platParameter))
     {
         // Initialize NV
         IntegrityData_t newIntegrity = {0};
@@ -280,13 +279,13 @@ _plat__NVEnable(
         if((result = NvHash2Data((uint8_t*)nvFile, sizeof(nvFile), NULL, 0, newIntegrity.s.sig.nvDigest)) == FALSE)
         {
             dbgPrint("WARNING NvHash2Data(nvFile) failed.\r\n");
-            s_NV_recoverable = TRUE;
+            s_NV_unrecoverable = TRUE;
             goto Cleanup;
         }
         if((result = NvHash2Data(tpmUnique, tpmUniqueSize, (uint8_t*)&newIntegrity.s.sig, sizeof(newIntegrity.s.sig), newIntegrity.s.nvSignature)) == FALSE)
         {
             dbgPrint("WARNING NvHash2Data(tpmUnique, newIntegrity) failed.\r\n");
-            s_NV_recoverable = TRUE;
+            s_NV_unrecoverable = TRUE;
             goto Cleanup;
         }
         if((result = NvFlashPages((uint8_t*)&nvIntegrity, (uint8_t*)&newIntegrity, sizeof(newIntegrity))) == FALSE)
@@ -297,6 +296,7 @@ _plat__NVEnable(
         }
         dbgPrint("Initialized %dkb NVFile.\r\n", sizeof(nvFile)/1024);
         memcpy(s_NV, nvFile, sizeof(s_NV));
+        s_NV_recoverable = TRUE;
     }
     else
     {
@@ -304,25 +304,25 @@ _plat__NVEnable(
         if((result = NvHash2Data(tpmUnique, tpmUniqueSize, (uint8_t*)&nvIntegrity.s.sig, sizeof(nvIntegrity.s.sig), nvDigest)) == FALSE)
         {
             dbgPrint("WARNING NvHash2Data(tpmUnique, nvIntegrity) failed.\r\n");
-            s_NV_recoverable = TRUE;
+            s_NV_unrecoverable = TRUE;
             goto Cleanup;
         }
         if(memcmp(nvDigest, nvIntegrity.s.nvSignature, sizeof(nvDigest)))
         {
             dbgPrint("WARNING NV signature invalid.\r\n");
-            s_NV_recoverable = TRUE;
+            s_NV_unrecoverable = TRUE;
             goto Cleanup;
         }
         if((result = NvHash2Data((uint8_t*)nvFile, sizeof(nvFile), NULL, 0, nvDigest)) == FALSE)
         {
             dbgPrint("WARNING NvHash2Data(nvFile) filed.\r\n");
-            s_NV_recoverable = TRUE;
+            s_NV_unrecoverable = TRUE;
             goto Cleanup;
         }
         if(memcmp(nvDigest, nvIntegrity.s.sig.nvDigest, sizeof(nvDigest)))
         {
             dbgPrint("WARNING NV integrity measurement invalid.\r\n");
-            s_NV_recoverable = TRUE;
+            s_NV_unrecoverable = TRUE;
             goto Cleanup;
         }
     }

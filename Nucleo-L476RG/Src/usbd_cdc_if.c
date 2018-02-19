@@ -65,7 +65,8 @@
 /* USER CODE BEGIN PRIVATE_TYPES */
 #define CDC_RTS_MASK   0x0002
 #define CDC_DTR_MASK   0x0001
-
+void TpmConnectionReset(void);
+int TpmSignalEvent(uint8_t* Buf, uint32_t *Len);
 /* USER CODE END PRIVATE_TYPES */ 
 /**
   * @}
@@ -281,10 +282,7 @@ static int8_t CDC_Control_FS  (uint8_t cmd, uint8_t* pbuf, uint16_t length)
       CDC_DTR = ((setupPkt->wVal & CDC_DTR_MASK) != 0);
       dbgPrint("CDC_SET_CONTROL_LINE_STATE: RTS=%d, DTR=%d\r\n", CDC_RTS, CDC_DTR);
       // Reset any ongoing cmd transfers
-      receivingCmd = -1;
-      receivingCursor = -1;
-      cmdRspSize = -1;
-      memset((void*)cmdRspBuf, 0x00, sizeof(cmdRspBuf));
+      TpmConnectionReset();
       break;
   }
 
@@ -318,141 +316,11 @@ static int8_t CDC_Control_FS  (uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS (uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
-    if(receivingCmd > 0)
+    if(!TpmSignalEvent(Buf, Len))
     {
-        memcpy((void*)&cmdRspBuf[receivingCursor], (void*)Buf, *Len);
-        receivingCursor += *Len;
-        dbgPrint("CommandData(%d/%d)\r\n", receivingCursor, receivingCmd);
-        if(receivingCursor >= receivingCmd)
-        {
-            cmdRspSize = receivingCursor;
-            receivingCmd = -1;
-            receivingCursor = -1;
-        }
+        return(USBD_FAIL);
     }
-    else if(sizeof(signalWrapper_t) > *Len)
-    {
-        dbgPrint("ERROR Invalid frame received.\r\n");
-        return (USBD_FAIL);
-    }
-    else
-    {
-        pSignalWrapper_t sig = (pSignalWrapper_t)Buf;
-        if(sig->s.magic == SIGNALMAGIC)
-        {
-            pSignalPayload_t payload;
-            switch(sig->s.signal)
-            {
-                case SignalNothing:
-                    if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
-                    {
-                        dbgPrint("ERROR Invalid data size.\r\n");
-                        return (USBD_FAIL);
-                    }
-                    dbgPrint("SignalNothing\r\n");
-                    break;
 
-                case SignalReset:
-                    if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
-                    {
-                        dbgPrint("ERROR Invalid data size.\r\n");
-                        return (USBD_FAIL);
-                    }
-                    dbgPrint("SignalReset\r\n");
-                    resetRequested = 1;
-                    break;
-
-                case SignalSetClock:
-                    if((sig->s.dataSize != sizeof(unsigned int)) || (*Len != sizeof(signalWrapper_t) + sizeof(unsigned int)))
-                    {
-                        dbgPrint("ERROR Invalid data size.\r\n");
-                        return (USBD_FAIL);
-                    }
-                    payload = (pSignalPayload_t)&Buf[sizeof(signalWrapper_t)];
-
-                    struct tm* local = localtime((time_t*)&payload->SignalSetClockPayload.time);
-                    RTC_TimeTypeDef time = {0};
-                    RTC_DateTypeDef date = {0};
-                    date.Year = local->tm_year - 100;
-                    date.Month = local->tm_mon + 1;
-                    date.Date = local->tm_mday;
-                    date.WeekDay = local->tm_wday  + 1;
-                    time.Hours = local->tm_hour;
-                    time.Minutes = local->tm_min;
-                    time.Seconds = local->tm_sec;
-                    if((HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN) != HAL_OK) ||
-                       (HAL_RTC_SetDate(&hrtc, &date, RTC_FORMAT_BIN) != HAL_OK))
-                    {
-                        dbgPrint("ERROR HAL_RTC_SetTime or HAL_RTC_SetDate failed.\r\n");
-                        return (USBD_FAIL);
-                    }
-                    dbgPrint("SignalSetClock(0x%08x)\r\n", payload->SignalSetClockPayload.time);
-                    break;
-
-                case SignalCancelOn:
-                    if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
-                    {
-                        dbgPrint("ERROR Invalid data size.\r\n");
-                        return (USBD_FAIL);
-                    }
-                    dbgPrint("SignalCancelOn\r\n");
-                    _plat__SetCancel();
-                    break;
-
-                case SignalCancelOff:
-                    if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
-                    {
-                        dbgPrint("ERROR Invalid data size.\r\n");
-                        return (USBD_FAIL);
-                    }
-                    dbgPrint("SignalCancelOff\r\n");
-                    _plat__ClearCancel();
-                    break;
-
-                case SignalCommand:
-                    if((sig->s.dataSize == 0) ||
-                       (*Len == sizeof(signalWrapper_t)) ||
-                       (cmdRspSize != -1))
-                    {
-                        dbgPrint("ERROR Invalid data size.\r\n");
-                        return (USBD_FAIL);
-                    }
-                    payload = (pSignalPayload_t)&Buf[sizeof(signalWrapper_t)];
-                    unsigned int expected = sizeof(signalWrapper_t) + sizeof(unsigned int) * 2 + payload->SignalCommandPayload.cmdSize;
-                    unsigned int maxAllowed = sizeof(cmdRspBuf);
-                    if((*Len == expected) &&
-                       (payload->SignalCommandPayload.cmdSize <= maxAllowed))
-                    {
-                        dbgPrint("SetLocality(%d)\r\n", payload->SignalCommandPayload.locality);
-                        _plat__LocalitySet(payload->SignalCommandPayload.locality);
-                        memcpy((void*)cmdRspBuf, (void*)payload->SignalCommandPayload.cmd, payload->SignalCommandPayload.cmdSize);
-                        cmdRspSize = payload->SignalCommandPayload.cmdSize;
-                        dbgPrint("SignalCommand(%d)\r\n", payload->SignalCommandPayload.cmdSize);
-                    }
-                    else if((*Len < expected) &&
-                            (payload->SignalCommandPayload.cmdSize <= maxAllowed))
-                    {
-                        dbgPrint("SetLocality(%d)\r\n", payload->SignalCommandPayload.locality);
-                        _plat__LocalitySet(payload->SignalCommandPayload.locality);
-                        unsigned int dataSnip = *Len - (sizeof(signalWrapper_t) + sizeof(unsigned int) * 2);
-                        dbgPrint("SignalCommand(%d/%d)\r\n", dataSnip, payload->SignalCommandPayload.cmdSize);
-                        memcpy((void*)cmdRspBuf, (void*)payload->SignalCommandPayload.cmd, dataSnip);
-                        receivingCmd = payload->SignalCommandPayload.cmdSize;
-                        receivingCursor = dataSnip;
-                    }
-                    else
-                    {
-                        dbgPrint("ERROR Invalid command size.\r\n");
-                        return (USBD_FAIL);
-                    }
-                    break;
-
-                default:
-                    return (USBD_FAIL);
-                    break;
-            }
-        }
-    }
     USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
     USBD_CDC_ReceivePacket(&hUsbDeviceFS);
     return (USBD_OK);
@@ -479,7 +347,6 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
     return USBD_BUSY;
   }
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Buf, Len);
-  dbgPrint("ResponseData(%d)\r\n", Len);
   result = USBD_CDC_TransmitPacket(&hUsbDeviceFS);
   /* USER CODE END 7 */ 
   return result;

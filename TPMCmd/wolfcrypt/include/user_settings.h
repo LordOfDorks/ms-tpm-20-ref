@@ -31,21 +31,35 @@
     extern "C" {
 #endif
 
-#define SINGLE_THREADED
-#define NO_FILESYSTEM
 #define NO_OLD_WC_NAMES
-#define WC_NO_HARDEN
 #define WOLFSSL_SHA384
 #define WOLFSSL_SHA512
+
 #define WOLFSSL_AES_DIRECT
+// #if defined ALG_TDES && ALG_TDES == YES
 #define WOLFSSL_DES_ECB
+
+// integer mp_gcd (TPM_ALG_RSA)
 #define WOLFSSL_KEY_GEN
+
 #define HAVE_ECC
 #define ECC_SHAMIR
+
 #define USE_FAST_MATH
-#define WOLFSSL_PUBLIC_ECC_ADD_DBL
+//#define FP_MAX_BITS LARGEST_NUMBER_BITS
+
+#define WC_NO_HARDEN
+
+#define WOLFSSL_PUBLIC_ECC_ADD_DBL 
+
 #define LIBRARY_COMPATIBILITY_CHECK
+
+/* Remove the automatic setting of the default I/O functions EmbedSend()
+    and EmbedReceive(). */
 #define WOLFSSL_USER_IO
+
+
+#define WOLFSSL_
 
 #ifdef __cplusplus
     }   /* extern "C" */

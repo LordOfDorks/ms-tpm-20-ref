@@ -53,11 +53,10 @@
 
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
+#include <stdbool.h>
 #include <time.h>
-#include <wolfssl/wolfcrypt/sha512.h>
-#define LIB_EXPORT
+#include "TpmDevice.h"
 
-volatile unsigned char* cmdQueue[4] = {0};
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -83,48 +82,16 @@ static void MX_USART3_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-extern char tpmUnique[WC_SHA512_DIGEST_SIZE];
-uint32_t _plat__GetUnique(uint32_t which, uint32_t bSize, unsigned char *b);
-uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 typedef unsigned char DEVICE_UNIQUE_ID_T[12];
 #define DEVICE_UNIQUE_ID (*(DEVICE_UNIQUE_ID_T*)(UID_BASE))
 #define DEVICE_FLASH_SIZE (*(uint16_t *)(FLASHSIZE_BASE))
 #define DEVICE_TYPE (*(uint16_t *) (DBGMCU->IDCODE & 0x00000fff))
 #define DEVICE_REV (*(uint16_t *) (DBGMCU->IDCODE >> 16))
-volatile int cmdRspSize = -1;
-volatile int receivingCmd = -1;
-volatile int receivingCursor = -1;
-volatile unsigned char cmdRspBuf[CMD_RSP_BUFFER_SIZE] = {0};
-volatile unsigned char resetRequested = 0;
 char logStampStr[40] = {0};
 
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-void GenerateTpmUnique(void)
-{
-    wc_Sha512 hash;
-    char uniqueStr[160] = {0};
-    unsigned int cursor = 0;
-    uint8_t unique[WC_SHA512_DIGEST_SIZE] = {0};
-    if((wc_InitSha512(&hash)) ||
-       (wc_Sha512Update(&hash, DEVICE_UNIQUE_ID, sizeof(DEVICE_UNIQUE_ID))) ||
-       (wc_Sha512Final(&hash, (byte*)tpmUnique)))
-    {
-        _Error_Handler(__FILE__, __LINE__, __func__);
-    }
-    wc_Sha512Free(&hash);
-    _plat__GetUnique(0, sizeof(unique), unique);
-#ifndef NDEBUG
-    for(uint32_t n = 0; n < sizeof(unique); n++)
-    {
-        if(!(n % 16)) cursor += sprintf(&uniqueStr[cursor],"\r\n    ");
-        cursor += sprintf(&uniqueStr[cursor], "%02x", ((unsigned int)(unique[n])));
-    }
-    dbgPrint("Generated tpmUnique%s\r\n", uniqueStr);
-#endif
-}
-
 char* GetLogStamp(void)
 {
     RTC_TimeTypeDef time = {0};
@@ -143,24 +110,85 @@ char* GetLogStamp(void)
     return logStampStr;
 }
 
-void ExecuteCommand(
-    uint32_t         requestSize,   // IN: command buffer size
-    unsigned char   *request,       // IN: command buffer
-    uint32_t        *responseSize,  // IN/OUT: response buffer size
-    unsigned char   **response      // IN/OUT: response buffer
-    )
+GPIO_PinState BlueButtonLast = GPIO_PIN_SET;
+int BlueButtonTransitionDetected(void)
 {
-    *responseSize = MIN(requestSize, *responseSize);
-    memcpy(*response, request, *responseSize);
+    GPIO_PinState PPButton = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
+    if((PPButton == GPIO_PIN_RESET) && (BlueButtonLast == GPIO_PIN_SET))
+    {
+        // Now pressed
+        BlueButtonLast = PPButton;
+        return 1;
+    }
+    else if((PPButton == GPIO_PIN_SET) && (BlueButtonLast == GPIO_PIN_RESET))
+    {
+        // Now released
+        BlueButtonLast = PPButton;
+        return -1;
+    }
+    // No change
+    return 0;
+}
+
+void SetDutyCycleIndicator(bool on)
+{
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+void KillUSBLink(void)
+{
+    dbgPrint("USB de-initialization...\r\n");
+    MX_USB_DEVICE_DeInit();
+}
+
+void SetRealTimeClock(time_t tm)
+{
+    struct tm* local = localtime((time_t*)&tm);
+    RTC_TimeTypeDef time = {0};
+    RTC_DateTypeDef date = {0};
+    date.Year = local->tm_year - 100;
+    date.Month = local->tm_mon + 1;
+    date.Date = local->tm_mday;
+    date.WeekDay = local->tm_wday  + 1;
+    time.Hours = local->tm_hour;
+    time.Minutes = local->tm_min;
+    time.Seconds = local->tm_sec;
+    HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN);
+    HAL_RTC_SetDate(&hrtc, &date, RTC_FORMAT_BIN);
+}
+
+void ReadMcuInfo(unsigned char* serial, uint16_t *flashSize, uint16_t *mcuType, uint16_t *mcuRev)
+{
+    if(serial)
+    {
+        memcpy(serial, DEVICE_UNIQUE_ID, sizeof(DEVICE_UNIQUE_ID));
+    }
+    if(flashSize)
+    {
+        *flashSize = DEVICE_FLASH_SIZE;
+    }
+    if(mcuType)
+    {
+        *mcuType = DEVICE_TYPE;
+    }
+    if(mcuRev)
+    {
+        *mcuRev = DEVICE_REV;
+    }
+}
+
+void PerformSystemReset(void)
+{
+    dbgPrint("Executing NVIC_SystemReset()...\r\n");
+    HAL_Delay(1);
+    NVIC_SystemReset();
 }
 
 /* USER CODE END 0 */
 
 int main(void)
 {
-
   /* USER CODE BEGIN 1 */
-    GPIO_PinState PPLast = GPIO_PIN_SET;
 
     /* USER CODE END 1 */
 
@@ -190,63 +218,27 @@ int main(void)
   MX_USB_DEVICE_Init();
 
   /* USER CODE BEGIN 2 */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-  dbgPrint("\r\n\r\n=========================\r\n"
-                   "= Nucleo-L476RG TPM 2.0 =\r\n"
-                   "=========================\r\n");
-  GenerateTpmUnique();
-
+  fprintf(stderr, "\r\n\r\n=========================\r\n"
+                         "= Nucleo-L476RG TPM 2.0 =\r\n"
+                         "=========================\r\n");
   /* USER CODE END 2 */
+  if(!TpmInitializeDevice())
+  {
+      _Error_Handler(__FILE__, __LINE__, __func__);
+  }
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-      // Device reset
-      if(resetRequested)
-      {
-          dbgPrint("Executing reset...\r\n");
-          HAL_Delay(1);
-          NVIC_SystemReset();
-      }
-
-      // Physical presence button (blue button on the Nucleo)
-      GPIO_PinState PPButton = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
-      if((PPButton == GPIO_PIN_RESET) && (PPLast == GPIO_PIN_SET))
-      {
-          _plat__Signal_PhysicalPresenceOn();
-          dbgPrint("Executing PhysicalPresenceOn.\r\n");
-          PPLast = PPButton;
-      }
-      else if((PPButton == GPIO_PIN_SET) && (PPLast == GPIO_PIN_RESET))
-      {
-          _plat__Signal_PhysicalPresenceOff();
-          dbgPrint("Executing PhysicalPresenceOff.\r\n");
-          PPLast = PPButton;
-      }
-
-      // Command processing
-      if(cmdRspSize > 0)
-      {
-          unsigned int rspSize = sizeof(cmdRspBuf) - sizeof(unsigned int);
-          unsigned char* rspBuf = (unsigned char*)&cmdRspBuf[sizeof(unsigned int)];
-          dbgPrint("Executing command (%d).\r\n", cmdRspSize);
-          HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-          _plat__RunCommand((unsigned int)cmdRspSize, (unsigned char*)cmdRspBuf, &rspSize, &rspBuf);
-          HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-          dbgPrint("Returned response (%d).\r\n", rspSize);
-          *((unsigned int*)cmdRspBuf) = rspSize;
-          cmdRspSize = sizeof(unsigned int) + rspSize;
-          CDC_Transmit_FS((unsigned char*)cmdRspBuf, (unsigned int)cmdRspSize);
-          dbgPrint("SetLocality(0)\r\n");
-          _plat__LocalitySet(0);
-          memset((unsigned char*)cmdRspBuf, 0x00, sizeof(cmdRspBuf));
-          cmdRspSize = -1;
-      }
 
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
+      if(!TpmOperationsLoop())
+      {
+          _Error_Handler(__FILE__, __LINE__, __func__);
+      }
   }
   /* USER CODE END 3 */
 

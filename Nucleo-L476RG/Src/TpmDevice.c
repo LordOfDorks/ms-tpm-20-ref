@@ -1,0 +1,352 @@
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <time.h>
+#include "main.h"
+#include <wolfssl/wolfcrypt/sha512.h>
+#undef INLINE
+#include "Tpm.h"
+#include "TpmDevice.h"
+
+volatile tpmOperation_t tpmOp = { 0 };
+extern char tpmUnique[WC_SHA512_DIGEST_SIZE];
+
+uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
+
+static bool TpmGenerateUnique(void)
+{
+    wc_Sha512 hash;
+    struct
+    {
+        uint16_t mcuType;
+        uint16_t mcuRev;
+        uint16_t flashSize;
+        unsigned char serial[12];
+    } mcuInfo;
+
+    ReadMcuInfo(mcuInfo.serial, &mcuInfo.flashSize, &mcuInfo.mcuType, &mcuInfo.mcuRev);
+
+    if((wc_InitSha512(&hash)) ||
+       (wc_Sha512Update(&hash, (const byte*)&mcuInfo, sizeof(mcuInfo))) ||
+       (wc_Sha512Final(&hash, (byte*)tpmUnique)))
+    {
+        logError("Sha512 failed\r\n");
+        return false;
+    }
+    wc_Sha512Free(&hash);
+
+#ifndef NDEBUG
+    uint8_t unique[WC_SHA512_DIGEST_SIZE] = {0};
+    _plat__GetUnique(0, sizeof(unique), unique);
+    dbgPrint("Generated tpmUnique");
+    for(uint32_t n = 0; n < sizeof(unique); n++)
+    {
+        if(!(n % 16)) dbgPrintAppend("\r\n    ");
+        dbgPrintAppend("%02x", ((unsigned int)(unique[n])));
+    }
+    dbgPrintAppend("\r\n");
+#endif
+    return true;
+}
+
+bool TpmInitializeDevice(void)
+{
+    int retVal = 0;
+
+    tpmOp.receivingCmd = -1;
+    TpmGenerateUnique();
+
+    SetDutyCycleIndicator(FALSE);
+
+    // Factory reset requested?
+    if(BlueButtonTransitionDetected())
+    {
+        dbgPrint("Factory reset requested.\r\n");
+        if((retVal = _plat__NVEnable((void*)1)) < 0)
+        {
+            logError("_plat__NVEnable(1) failed unrecoverable.")
+        }
+        dbgPrint("Waiting for the button to be released...\r\n");
+        while(BlueButtonTransitionDetected() == 0);
+    }
+    else
+    {
+        if((retVal = _plat__NVEnable((void*)0)) < 0)
+        {
+            logError("_plat__NVEnable(0) failed unrecoverable.")
+        }
+    }
+
+
+    if(retVal > 0)
+    {
+        dbgPrint("TPM_Manufacture(1) requested.\r\n");
+        if((retVal = TPM_Manufacture(1)) != 0)
+        {
+            logError("TPM_Manufacture(1) failed.\r\n");
+        }
+    }
+
+    dbgPrint("_plat__SetNvAvail().\r\n");
+    _plat__SetNvAvail();
+    dbgPrint("_plat__Signal_PowerOn().\r\n");
+    if((retVal =_plat__Signal_PowerOn()) != 0)
+    {
+        logError("_plat__Signal_PowerOn() failed.\r\n");
+    }
+    dbgPrint("_plat__Signal_Reset().\r\n");
+    if((retVal =_plat__Signal_Reset()) != 0)
+    {
+        logError("_plat__Signal_Reset() failed.\r\n");
+    }
+    return (retVal == 0);
+}
+
+bool TpmOperationsLoop(void)
+{
+    // Device reset
+    if(tpmOp.flags.resetRequested == 1)
+    {
+        tpmOp.flags.resetRequested = 0;
+
+        HAL_Delay(1);
+        dbgPrint("Executing _plat__Signal_PowerOff()\r\n");
+        _plat__Signal_PowerOff();
+        PerformSystemReset();
+        return false;
+    }
+
+    if(tpmOp.flags.powerOffRequested == 1)
+    {
+        tpmOp.flags.powerOffRequested = 0;
+        dbgPrint("Executing _plat__Signal_PowerOff()\r\n");
+        _plat__Signal_PowerOff();
+        KillUSBLink();
+        return false;
+    }
+
+    // Physical presence button (blue button on the Nucleo)
+    int ppButton = BlueButtonTransitionDetected();
+    if(ppButton > 0)
+    {
+        dbgPrint("Executing _plat__Signal_PhysicalPresenceOn().\r\n");
+        _plat__Signal_PhysicalPresenceOn();
+    }
+    else if (ppButton < 0)
+    {
+        dbgPrint("Executing _plat__Signal_PhysicalPresenceOff().\r\n");
+        _plat__Signal_PhysicalPresenceOff();
+    }
+
+    // Command processing
+    if(tpmOp.flags.executionRequested == 1)
+    {
+        tpmOp.flags.executionRequested = 0;
+        unsigned int* rspLenTPM = (unsigned int*)tpmOp.rspBuf;
+        unsigned char* rspTPM = (unsigned char*)&tpmOp.rspBuf[sizeof(*rspLenTPM)];
+        *rspLenTPM = sizeof(tpmOp.rspBuf) - sizeof(*rspLenTPM);
+
+        dbgPrintAppend("unsigned char CmdBuf[%d] = {", tpmOp.cmdSize);
+        for(uint32_t n = 0; n < tpmOp.cmdSize; n++)
+        {
+            if(n > 0) dbgPrintAppend(", ");
+            if(!(n % 16)) dbgPrintAppend("\r\n");
+            dbgPrintAppend("0x%02x", tpmOp.cmdBuf[n]);
+        }
+        dbgPrintAppend("\r\n};\r\n");
+
+        SetDutyCycleIndicator(TRUE);
+        dbgPrint("Execution running...\r\n");
+        time_t execStart = time(NULL);
+        _plat__RunCommand((unsigned int)tpmOp.cmdSize, (unsigned char*)tpmOp.cmdBuf, rspLenTPM, &rspTPM);
+        time_t execEnd = time(NULL);
+        dbgPrint("Completion time: %u'%u\"\r\n", (unsigned int)(execEnd - execStart) / 60, (unsigned int)(execEnd - execStart) % 60);
+        SetDutyCycleIndicator(FALSE);
+
+        dbgPrintAppend("unsigned char RspBuf[%d] = {", tpmOp.cmdSize);
+        for(uint32_t n = 0; n < *rspLenTPM; n++)
+        {
+            if(n > 0) dbgPrintAppend(", ");
+            if(!(n % 16)) dbgPrintAppend("\r\n");
+            dbgPrintAppend("0x%02x", rspTPM[n]);
+        }
+        dbgPrintAppend("\r\n};\r\n");
+
+        tpmOp.rspSize = sizeof(*rspLenTPM) + *rspLenTPM;
+        tpmOp.flags.responseRequested = 1;
+    }
+
+    if(tpmOp.flags.responseRequested == 1)
+    {
+        tpmOp.flags.responseRequested = 0;
+        if(tpmOp.rspSize > 0)
+        {
+            dbgPrint("Sent(%d)\r\n", tpmOp.rspSize);
+            for(uint32_t n = 0; n < tpmOp.rspSize; n++)
+            {
+                while(CDC_Transmit_FS((unsigned char*)&tpmOp.rspBuf[n], 1) != 0);
+            }
+        }
+    }
+
+    return true;
+}
+
+void TpmConnectionReset(void)
+{
+    tpmOp.receivingCmd = -1;
+    tpmOp.cmdSize = 0;
+    tpmOp.rspSize = 0;
+    memset((void*)tpmOp.cmdBuf, 0x00, sizeof(tpmOp.cmdBuf));
+    memset((void*)tpmOp.rspBuf, 0x00, sizeof(tpmOp.rspBuf));
+}
+
+bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
+{
+    // Pending inbound transfer
+    if(tpmOp.receivingCmd > 0)
+    {
+        memcpy((void*)&tpmOp.cmdBuf[tpmOp.cmdSize], (void*)Buf, *Len);
+        tpmOp.cmdSize += *Len;
+        dbgPrint("Received(%d)\r\n", tpmOp.cmdSize);
+        if(tpmOp.cmdSize >= tpmOp.receivingCmd)
+        {
+            tpmOp.receivingCmd = -1;
+            tpmOp.flags.executionRequested = 1;
+        }
+    }
+    else if(sizeof(signalWrapper_t) > *Len)
+    {
+        logError("Invalid frame received.\r\n");
+        return false;
+    }
+    else
+    {
+        pSignalWrapper_t sig = (pSignalWrapper_t)Buf;
+        if(sig->s.magic == SIGNALMAGIC)
+        {
+            pSignalPayload_t payload;
+            switch(sig->s.signal)
+            {
+                case SignalNothing:
+                    if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
+                    {
+                        logError("Invalid data size %u for SignalNothing(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        return false;
+                    }
+                    dbgPrint("SignalNothing\r\n");
+                    break;
+
+                case SignalShutdown:
+                    if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
+                    {
+                        logError("Invalid data size %u for SignalShutdown(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        return false;
+                    }
+                    dbgPrint("SignalShutdown\r\n");
+                    tpmOp.flags.powerOffRequested = 1;
+                    break;
+
+                case SignalReset:
+                    if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
+                    {
+                        logError("Invalid data size %u for SignalReset(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        return false;
+                    }
+                    dbgPrint("SignalReset\r\n");
+                    tpmOp.flags.resetRequested = 1;
+                    break;
+
+                case SignalSetClock:
+                    if((sig->s.dataSize != sizeof(unsigned int)) || (*Len != sizeof(signalWrapper_t) + sizeof(unsigned int)))
+                    {
+                        logError("Invalid data size %u for SignalSetClock(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        return false;
+                    }
+                    payload = (pSignalPayload_t)&Buf[sizeof(signalWrapper_t)];
+                    SetRealTimeClock(payload->SignalSetClockPayload.time);
+                    dbgPrint("SignalSetClock(0x%08x)\r\n", payload->SignalSetClockPayload.time);
+                    break;
+
+                case SignalCancelOn:
+                    if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
+                    {
+                        logError("Invalid data size %u for SignalCancelOn(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        return false;
+                    }
+                    dbgPrint("SignalCancelOn\r\n");
+                    _plat__SetCancel();
+                    break;
+
+                case SignalCancelOff:
+                    if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
+                    {
+                        logError("Invalid data size %u for SignalCancelOff(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        return false;
+                    }
+                    dbgPrint("SignalCancelOff\r\n");
+                    _plat__ClearCancel();
+                    break;
+
+                case SignalCommand:
+                    if((sig->s.dataSize == 0) ||
+                       (*Len == sizeof(signalWrapper_t)))
+                    {
+                        logError("Invalid data size %u for SignalCommand(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        return false;
+                    }
+                    payload = (pSignalPayload_t)&Buf[sizeof(signalWrapper_t)];
+                    unsigned int expected = sizeof(signalWrapper_t) + sizeof(unsigned int) * 2 + payload->SignalCommandPayload.cmdSize;
+                    unsigned int maxAllowed = sizeof(tpmOp.cmdBuf);
+                    dbgPrint("SignalCommand(%d)\r\n", payload->SignalCommandPayload.cmdSize);
+
+                    // Set the locality for the command
+                    if(_plat__LocalityGet() != payload->SignalCommandPayload.locality)
+                    {
+                        _plat__LocalitySet(payload->SignalCommandPayload.locality);
+                        dbgPrint("SetLocality(%d)\r\n", payload->SignalCommandPayload.locality);
+                    }
+
+                    if((*Len == expected) &&
+                       (payload->SignalCommandPayload.cmdSize <= maxAllowed))
+                    {
+                        memcpy((void*)tpmOp.cmdBuf, (void*)payload->SignalCommandPayload.cmd, payload->SignalCommandPayload.cmdSize);
+                        tpmOp.cmdSize = payload->SignalCommandPayload.cmdSize;
+                        tpmOp.flags.executionRequested = 1;
+                        dbgPrint("Received(%d)\r\n", tpmOp.cmdSize);
+                    }
+                    else if((*Len < expected) &&
+                            (payload->SignalCommandPayload.cmdSize <= maxAllowed))
+                    {
+                        unsigned int dataSnip = *Len - (sizeof(signalWrapper_t) + sizeof(unsigned int) * 2);
+                        memcpy((void*)tpmOp.cmdBuf, (void*)payload->SignalCommandPayload.cmd, dataSnip);
+                        tpmOp.receivingCmd = payload->SignalCommandPayload.cmdSize;
+                        tpmOp.cmdSize = dataSnip;
+                        dbgPrint("Received(%d)\r\n", tpmOp.cmdSize);
+                    }
+                    else
+                    {
+                        logError("Invalid command size.\r\n");
+                        return false;
+                    }
+                    break;
+
+                case SignalResponse:
+                    if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
+                    {
+                        logError("Invalid data size %u for SignalResponse(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        return false;
+                    }
+                    dbgPrint("SignalResponse\r\n");
+                    tpmOp.flags.responseRequested = 1;
+                    break;
+
+                default:
+                    logError("Unknown Signal %u received.\r\n", sig->s.signal);
+                    return false;
+                    break;
+            }
+        }
+    }
+    return true;
+}

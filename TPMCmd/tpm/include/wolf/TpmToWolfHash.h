@@ -35,21 +35,23 @@
 
 //** Introduction
 //
-// This header file is used to 'splice' the OpenSSL hash code into the TPM code.
+// This header file is used to 'splice' the wolfcrypt hash code into the TPM code.
 //
 #ifndef _TPM_TO_WOLF_HASH_H_
 #define _TPM_TO_WOLF_HASH_H_
 
 #if HASH_LIB == WOLF
 
+#ifndef WOLFSSL_USER_SETTINGS
 #define WOLFSSL_USER_SETTINGS
+#endif
 #include <wolfSSL/wolfCrypt/sha.h>
 #include <wolfSSL/wolfCrypt/sha256.h>
 #include <wolfSSL/wolfCrypt/sha512.h>
 
 
 //***************************************************************
-//** Links to the OpenSSL HASH code 
+//** Links to the wolfcrypt HASH code 
 //***************************************************************
 
 // Redefine the internal name used for each of the hash state structures to the 

@@ -72,9 +72,34 @@
 	</natures>
 	<linkedResources>
 		<link>
+			<name>Middlewares/TPMCmd</name>
+			<type>2</type>
+			<locationURI>PARENT-1-PROJECT_LOC/TPMCmd/tpm/src</locationURI>
+		</link>
+		<link>
 			<name>Middlewares/WolfCypt</name>
 			<type>2</type>
 			<locationURI>virtual:/virtual</locationURI>
+		</link>
+		<link>
+			<name>Middlewares/WolfCypt/aes.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/wolfssl/wolfcrypt/src/aes.c</locationURI>
+		</link>
+		<link>
+			<name>Middlewares/WolfCypt/ecc.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/wolfssl/wolfcrypt/src/ecc.c</locationURI>
+		</link>
+		<link>
+			<name>Middlewares/WolfCypt/integer.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/wolfssl/wolfcrypt/src/integer.c</locationURI>
+		</link>
+		<link>
+			<name>Middlewares/WolfCypt/memory.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/wolfssl/wolfcrypt/src/memory.c</locationURI>
 		</link>
 		<link>
 			<name>Middlewares/WolfCypt/sha.c</name>
@@ -90,6 +115,16 @@
 			<name>Middlewares/WolfCypt/sha512.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/external/wolfssl/wolfcrypt/src/sha512.c</locationURI>
+		</link>
+		<link>
+			<name>Middlewares/WolfCypt/tfm.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/wolfssl/wolfcrypt/src/tfm.c</locationURI>
+		</link>
+		<link>
+			<name>Middlewares/WolfCypt/wolfmath.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/wolfssl/wolfcrypt/src/wolfmath.c</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>
