@@ -142,29 +142,29 @@ bool TpmOperationsLoop(void)
     if(tpmOp.flags.executionRequested == 1)
     {
         tpmOp.flags.executionRequested = 0;
-        unsigned int* rspLenTPM = (unsigned int*)tpmOp.rspBuf;
-        unsigned char* rspTPM = (unsigned char*)&tpmOp.rspBuf[sizeof(*rspLenTPM)];
-        *rspLenTPM = sizeof(tpmOp.rspBuf) - sizeof(*rspLenTPM);
+        unsigned int rspLenTPM = sizeof(tpmOp.msgBuf) - sizeof(rspLenTPM);
+        unsigned char* rspTPM = (unsigned char*)&tpmOp.msgBuf[sizeof(rspLenTPM)];
 
         dbgPrintAppend("unsigned char CmdBuf[%d] = {", tpmOp.cmdSize);
         for(uint32_t n = 0; n < tpmOp.cmdSize; n++)
         {
             if(n > 0) dbgPrintAppend(", ");
             if(!(n % 16)) dbgPrintAppend("\r\n");
-            dbgPrintAppend("0x%02x", tpmOp.cmdBuf[n]);
+            dbgPrintAppend("0x%02x", tpmOp.msgBuf[n]);
         }
         dbgPrintAppend("\r\n};\r\n");
 
         SetDutyCycleIndicator(TRUE);
         dbgPrint("Execution running...\r\n");
         time_t execStart = time(NULL);
-        _plat__RunCommand((unsigned int)tpmOp.cmdSize, (unsigned char*)tpmOp.cmdBuf, rspLenTPM, &rspTPM);
+        _plat__RunCommand((unsigned int)tpmOp.cmdSize, (unsigned char*)tpmOp.msgBuf, &rspLenTPM, &rspTPM);
+        *((unsigned int*)tpmOp.msgBuf) = rspLenTPM;
         time_t execEnd = time(NULL);
-        dbgPrint("Completion time: %u'%u\"\r\n", (unsigned int)(execEnd - execStart) / 60, (unsigned int)(execEnd - execStart) % 60);
+        dbgPrint("Completion time %u'%u\"\r\n", (unsigned int)(execEnd - execStart) / 60, (unsigned int)(execEnd - execStart) % 60);
         SetDutyCycleIndicator(FALSE);
 
         dbgPrintAppend("unsigned char RspBuf[%d] = {", tpmOp.cmdSize);
-        for(uint32_t n = 0; n < *rspLenTPM; n++)
+        for(uint32_t n = 0; n < rspLenTPM; n++)
         {
             if(n > 0) dbgPrintAppend(", ");
             if(!(n % 16)) dbgPrintAppend("\r\n");
@@ -172,7 +172,8 @@ bool TpmOperationsLoop(void)
         }
         dbgPrintAppend("\r\n};\r\n");
 
-        tpmOp.rspSize = sizeof(*rspLenTPM) + *rspLenTPM;
+        tpmOp.rspSize = sizeof(rspLenTPM) + rspLenTPM;
+        tpmOp.cmdSize = 0;
         tpmOp.flags.responseRequested = 1;
     }
 
@@ -181,11 +182,16 @@ bool TpmOperationsLoop(void)
         tpmOp.flags.responseRequested = 0;
         if(tpmOp.rspSize > 0)
         {
-            dbgPrint("Sent(%d)\r\n", tpmOp.rspSize);
-            for(uint32_t n = 0; n < tpmOp.rspSize; n++)
+            uint32_t chunk = 0;
+            while(CDC_Transmit_FS((unsigned char*)&tpmOp.msgBuf, 0) != 0); // Wake up the link
+            while(CDC_Transmit_FS((unsigned char*)&tpmOp.msgBuf, 14) != 0); // Send the header which is the minimum size
+            for(uint32_t n = 14; n < tpmOp.rspSize; n += chunk) // Send the rest in 16 byte increments
             {
-                while(CDC_Transmit_FS((unsigned char*)&tpmOp.rspBuf[n], 1) != 0);
+                chunk = MIN(16, tpmOp.rspSize - n);
+                while(CDC_Transmit_FS((unsigned char*)&tpmOp.msgBuf[n], chunk) != 0);
+                dbgPrint("Sent(%u)\r\n", (unsigned int)(n + chunk));
             }
+            dbgPrint("Response(%d)\r\n", tpmOp.rspSize);
         }
     }
 
@@ -197,8 +203,7 @@ void TpmConnectionReset(void)
     tpmOp.receivingCmd = -1;
     tpmOp.cmdSize = 0;
     tpmOp.rspSize = 0;
-    memset((void*)tpmOp.cmdBuf, 0x00, sizeof(tpmOp.cmdBuf));
-    memset((void*)tpmOp.rspBuf, 0x00, sizeof(tpmOp.rspBuf));
+    memset((void*)tpmOp.msgBuf, 0x00, sizeof(tpmOp.msgBuf));
 }
 
 bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
@@ -206,7 +211,7 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
     // Pending inbound transfer
     if(tpmOp.receivingCmd > 0)
     {
-        memcpy((void*)&tpmOp.cmdBuf[tpmOp.cmdSize], (void*)Buf, *Len);
+        memcpy((void*)&tpmOp.msgBuf[tpmOp.cmdSize], (void*)Buf, *Len);
         tpmOp.cmdSize += *Len;
         dbgPrint("Received(%d)\r\n", tpmOp.cmdSize);
         if(tpmOp.cmdSize >= tpmOp.receivingCmd)
@@ -297,7 +302,9 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                     }
                     payload = (pSignalPayload_t)&Buf[sizeof(signalWrapper_t)];
                     unsigned int expected = sizeof(signalWrapper_t) + sizeof(unsigned int) * 2 + payload->SignalCommandPayload.cmdSize;
-                    unsigned int maxAllowed = sizeof(tpmOp.cmdBuf);
+                    unsigned int maxAllowed = sizeof(tpmOp.msgBuf);
+                    memset((unsigned char*)tpmOp.msgBuf, 0x00, sizeof(tpmOp.msgBuf));
+                    tpmOp.rspSize = 0;
                     dbgPrint("SignalCommand(%d)\r\n", payload->SignalCommandPayload.cmdSize);
 
                     // Set the locality for the command
@@ -310,7 +317,7 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                     if((*Len == expected) &&
                        (payload->SignalCommandPayload.cmdSize <= maxAllowed))
                     {
-                        memcpy((void*)tpmOp.cmdBuf, (void*)payload->SignalCommandPayload.cmd, payload->SignalCommandPayload.cmdSize);
+                        memcpy((void*)tpmOp.msgBuf, (void*)payload->SignalCommandPayload.cmd, payload->SignalCommandPayload.cmdSize);
                         tpmOp.cmdSize = payload->SignalCommandPayload.cmdSize;
                         tpmOp.flags.executionRequested = 1;
                         dbgPrint("Received(%d)\r\n", tpmOp.cmdSize);
@@ -319,7 +326,7 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                             (payload->SignalCommandPayload.cmdSize <= maxAllowed))
                     {
                         unsigned int dataSnip = *Len - (sizeof(signalWrapper_t) + sizeof(unsigned int) * 2);
-                        memcpy((void*)tpmOp.cmdBuf, (void*)payload->SignalCommandPayload.cmd, dataSnip);
+                        memcpy((void*)tpmOp.msgBuf, (void*)payload->SignalCommandPayload.cmd, dataSnip);
                         tpmOp.receivingCmd = payload->SignalCommandPayload.cmdSize;
                         tpmOp.cmdSize = dataSnip;
                         dbgPrint("Received(%d)\r\n", tpmOp.cmdSize);
@@ -338,7 +345,10 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                         return false;
                     }
                     dbgPrint("SignalResponse\r\n");
-                    tpmOp.flags.responseRequested = 1;
+                    if(tpmOp.rspSize > 0)
+                    {
+                        tpmOp.flags.responseRequested = 1;
+                    }
                     break;
 
                 default:

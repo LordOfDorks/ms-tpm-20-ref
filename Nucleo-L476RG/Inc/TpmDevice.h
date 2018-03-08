@@ -1,6 +1,5 @@
 #define SIGNALMAGIC (0x326d7054) //Tpm2
-#define MAX_TPM_COMMAND_SIZE (1024)
-#define MAX_TPM_RESPONSE_SIZE (sizeof(unsigned int) + 1024)
+#define MAX_TPM_MESSAGE_SIZE (sizeof(unsigned int) + 2048)
 
 typedef enum
 {
@@ -58,9 +57,8 @@ typedef struct tpmOperation_t
     tpmOperationsFlags_t flags;
     int cmdSize;
     int receivingCmd;
-    unsigned char cmdBuf[MAX_TPM_COMMAND_SIZE];
     int rspSize;
-    unsigned char rspBuf[MAX_TPM_RESPONSE_SIZE];
+    unsigned char msgBuf[MAX_TPM_MESSAGE_SIZE];
 } tpmOperation_t;
 
 extern volatile tpmOperation_t tpmOp;
