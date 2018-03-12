@@ -19,7 +19,7 @@
 							<option id="com.atollic.truestudio.toolchain_options.mcu.786502265" name="Microcontroller" superClass="com.atollic.truestudio.toolchain_options.mcu" value="STM32L476RG" valueType="string"/>
 							<option id="com.atollic.truestudio.toolchain_options.vendor.1287545731" name="Vendor name" superClass="com.atollic.truestudio.toolchain_options.vendor" value="STMicroelectronics" valueType="string"/>
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="com.atollic.truestudio.exe.debug.toolchain.platform.2054752829" isAbstract="false" name="Debug platform" superClass="com.atollic.truestudio.exe.debug.toolchain.platform"/>
-							<builder buildPath="${workspace_loc:/Nucleo-L476RG}/Debug" customBuilderProperties="toolChainpathString=C:\\Program Files (x86)\\Atollic\\TrueSTUDIO for STM32 9.0.0\\ARMTools\\bin|toolChainpathType=1|" id="com.atollic.truestudio.mbs.builder1.1222194476" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CDT Internal Builder" superClass="com.atollic.truestudio.mbs.builder1">
+							<builder buildPath="${workspace_loc:/Nucleo-L476RG}/Debug" customBuilderProperties="toolChainpathType=1|toolChainpathString=C:\\Program Files (x86)\\Atollic\\TrueSTUDIO for STM32 9.0.0\\ARMTools\\bin|" id="com.atollic.truestudio.mbs.builder1.1222194476" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CDT Internal Builder" superClass="com.atollic.truestudio.mbs.builder1">
 								<outputEntries>
 									<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="outputPath" name="Debug"/>
 								</outputEntries>
@@ -51,9 +51,9 @@
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32L4xx/Include"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
-									<listOptionValue builtIn="false" value="../../TPMCmd/tpm/include"/>
-									<listOptionValue builtIn="false" value="../../TPMCmd/tpm/include/prototypes"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../TPMCmd/tpm/include"/>
+									<listOptionValue builtIn="false" value="../../../../TPMCmd/tpm/include/prototypes"/>
 									<listOptionValue builtIn="false" value="../Middlewares/Platform/include"/>
 									<listOptionValue builtIn="false" value="../Middlewares/Platform/include/prototypes"/>
 								</option>
@@ -133,9 +133,9 @@
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="com.atollic.truestudio.exe.debug.toolchain.platform" isAbstract="false" name="Debug platform" osList="all" superClass="com.atollic.truestudio.exe.debug.toolchain.platform"/>
 							<tool id="com.atollic.truestudio.exe.debug.toolchain.as.363280954" name="Assembler" superClass="com.atollic.truestudio.exe.debug.toolchain.as.1545899283">
 								<option id="com.atollic.truestudio.as.general.incpath.223888856" name="Include path" superClass="com.atollic.truestudio.as.general.incpath" valueType="includePath">
-									<listOptionValue builtIn="false" value="../../external/wolfssl/"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl/wolfssl/wolfcrypt"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl/"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl/wolfssl/wolfcrypt"/>
 								</option>
 								<inputType id="com.atollic.truestudio.as.input.20577064" name="Input" superClass="com.atollic.truestudio.as.input"/>
 							</tool>
@@ -148,7 +148,7 @@
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32L4xx/Include"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
 								</option>
 								<inputType id="com.atollic.truestudio.gcc.input.1526137773" superClass="com.atollic.truestudio.gcc.input"/>
 							</tool>
@@ -167,10 +167,10 @@
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="com.atollic.truestudio.exe.debug.toolchain.platform" isAbstract="false" name="Debug platform" osList="all" superClass="com.atollic.truestudio.exe.debug.toolchain.platform"/>
 							<tool id="com.atollic.truestudio.exe.debug.toolchain.as.44489475" name="Assembler" superClass="com.atollic.truestudio.exe.debug.toolchain.as.1545899283">
 								<option id="com.atollic.truestudio.as.general.incpath.1486730401" name="Include path" superClass="com.atollic.truestudio.as.general.incpath" valueType="includePath">
-									<listOptionValue builtIn="false" value="../../TPMCmd/Platform/include"/>
-									<listOptionValue builtIn="false" value="../../TPMCmd/tpm/include"/>
-									<listOptionValue builtIn="false" value="../../TPMCmd/tpm/include/prototypes"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../TPMCmd/Platform/include"/>
+									<listOptionValue builtIn="false" value="../../../../TPMCmd/tpm/include"/>
+									<listOptionValue builtIn="false" value="../../../../TPMCmd/tpm/include/prototypes"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
 								</option>
 								<inputType id="com.atollic.truestudio.as.input.14696053" name="Input" superClass="com.atollic.truestudio.as.input"/>
 							</tool>
@@ -183,11 +183,11 @@
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32L4xx/Include"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
-									<listOptionValue builtIn="false" value="../../TPMCmd/tpm/include"/>
-									<listOptionValue builtIn="false" value="../../TPMCmd/tpm/include/prototypes"/>
+									<listOptionValue builtIn="false" value="../../../../TPMCmd/tpm/include"/>
+									<listOptionValue builtIn="false" value="../../../../TPMCmd/tpm/include/prototypes"/>
 									<listOptionValue builtIn="false" value="../Middlewares/Platform/include"/>
 									<listOptionValue builtIn="false" value="../Middlewares/Platform/include/prototypes"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
 								</option>
 								<inputType id="com.atollic.truestudio.gcc.input.1694505105" superClass="com.atollic.truestudio.gcc.input"/>
 							</tool>
@@ -216,9 +216,9 @@
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32L4xx/Include"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
-									<listOptionValue builtIn="false" value="../../TPMCmd/tpm/include"/>
-									<listOptionValue builtIn="false" value="../../TPMCmd/tpm/include/prototypes"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../TPMCmd/tpm/include"/>
+									<listOptionValue builtIn="false" value="../../../../TPMCmd/tpm/include/prototypes"/>
 									<listOptionValue builtIn="false" value="../Middlewares/Platform/include"/>
 									<listOptionValue builtIn="false" value="../Middlewares/Platform/include/prototypes"/>
 								</option>
@@ -252,7 +252,7 @@
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32L4xx/Include"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
 								</option>
 								<inputType id="com.atollic.truestudio.gcc.input.1468931059" superClass="com.atollic.truestudio.gcc.input"/>
 							</tool>
@@ -263,6 +263,11 @@
 							<tool id="com.atollic.truestudio.exe.debug.toolchain.secoutput.533367214" name="Other" superClass="com.atollic.truestudio.exe.debug.toolchain.secoutput.839033486"/>
 						</toolChain>
 					</folderInfo>
+					<fileInfo id="com.atollic.truestudio.exe.debug.1518366166.1363160894" name="aes.c" rcbsApplicability="disable" resourcePath="Middlewares/WolfCypt/aes.c" toolsToInvoke="com.atollic.truestudio.exe.debug.toolchain.gcc.533114787.1403049876">
+						<tool id="com.atollic.truestudio.exe.debug.toolchain.gcc.533114787.1403049876" name="C Compiler" superClass="com.atollic.truestudio.exe.debug.toolchain.gcc.533114787">
+							<inputType id="com.atollic.truestudio.gcc.input.2025793505" superClass="com.atollic.truestudio.gcc.input"/>
+						</tool>
+					</fileInfo>
 					<sourceEntries>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="startup"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Middlewares"/>
@@ -304,8 +309,8 @@
 								<option id="com.atollic.truestudio.common_options.target.mcpu.286463162" name="Microcontroller" superClass="com.atollic.truestudio.common_options.target.mcpu" value="STM32L476RG" valueType="enumerated"/>
 								<option id="com.atollic.truestudio.common_options.target.instr_set.2033833414" name="Instruction set" superClass="com.atollic.truestudio.common_options.target.instr_set" value="com.atollic.truestudio.common_options.target.instr_set.thumb2" valueType="enumerated"/>
 								<option id="com.atollic.truestudio.as.general.incpath.770237934" name="Include path" superClass="com.atollic.truestudio.as.general.incpath" valueType="includePath">
-									<listOptionValue builtIn="false" value="../../external/wolfssl/"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl/"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
 								</option>
 								<option id="com.atollic.truestudio.gcc.symbols.defined.1670122205" name="Defined symbols" superClass="com.atollic.truestudio.gcc.symbols.defined"/>
 								<option id="com.atollic.truestudio.as.general.otherflags.51384659" name="Other options" superClass="com.atollic.truestudio.as.general.otherflags" value="" valueType="string"/>
@@ -326,8 +331,8 @@
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32L4xx/Include"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl/"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl/"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
 								</option>
 								<option id="com.atollic.truestudio.gcc.symbols.defined.1670122205" name="Defined symbols" superClass="com.atollic.truestudio.gcc.symbols.defined" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__weak=__attribute__((weak))"/>
@@ -404,9 +409,9 @@
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="com.atollic.truestudio.exe.release.toolchain.platform" isAbstract="false" name="release platform" superClass="com.atollic.truestudio.exe.release.toolchain.platform"/>
 							<tool id="com.atollic.truestudio.exe.release.toolchain.as.1218363161" name="Assembler" superClass="com.atollic.truestudio.exe.release.toolchain.as.1545899283">
 								<option id="com.atollic.truestudio.as.general.incpath.1683701632" name="Include path" superClass="com.atollic.truestudio.as.general.incpath" valueType="includePath">
-									<listOptionValue builtIn="false" value="../../external/wolfssl/"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl/wolfssl/wolfcrypt"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl/"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl/wolfssl/wolfcrypt"/>
 								</option>
 								<inputType id="com.atollic.truestudio.as.input.1372037892" name="Input" superClass="com.atollic.truestudio.as.input"/>
 							</tool>
@@ -419,9 +424,9 @@
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32L4xx/Include"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl/"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl"/>
-									<listOptionValue builtIn="false" value="../../external/wolfssl/wolfssl/wolfcrypt"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl/"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl"/>
+									<listOptionValue builtIn="false" value="../../../../external/wolfssl/wolfssl/wolfcrypt"/>
 								</option>
 								<inputType id="com.atollic.truestudio.gcc.input.451161089" superClass="com.atollic.truestudio.gcc.input"/>
 							</tool>
