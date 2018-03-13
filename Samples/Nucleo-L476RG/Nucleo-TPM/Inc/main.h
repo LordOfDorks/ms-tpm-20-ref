@@ -80,18 +80,7 @@
 /* #define USE_FULL_ASSERT    1U */
 
 /* USER CODE BEGIN Private defines */
-#ifndef NDEBUG
-#define dbgPrint(fmt, ...) fprintf(stderr, "%s: " fmt, GetLogStamp(), ##__VA_ARGS__);
-#define dbgPrintAppend(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__);
-#else
-#define dbgPrint(fmt, ...) ((void)0)
-#define dbgPrintAppend(fmt, ...) ((void)0)
-#endif
-#define logError(fmt, ...) dbgPrint("[ERROR] %s (%s@%u) - " fmt, __func__, __FILE__, __LINE__, ##__VA_ARGS__);
-#define logWarning(fmt, ...) dbgPrint("[WARNING] %s (%s@%u) - " fmt, __func__, __FILE__, __LINE__, ##__VA_ARGS__);
-#define logInfo(fmt, ...) dbgPrint("[Info] %s (%s@%u) - " fmt, __func__, __FILE__, __LINE__, ##__VA_ARGS__);
-extern char logStampStr[40];
-char* GetLogStamp(void);
+
 
 /* USER CODE END Private defines */
 

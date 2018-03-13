@@ -46,6 +46,7 @@
 #include <assert.h>
 #include <time.h>
 #include <wolfssl/wolfcrypt/sha512.h>
+#include "StmUtil.h"
 #undef INLINE
 #include "stm32l4xx_hal.h"
 #include "PlatformData.h"

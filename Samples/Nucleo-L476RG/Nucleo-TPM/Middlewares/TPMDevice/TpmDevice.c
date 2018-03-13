@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
-#include "main.h"
+#include "StmUtil.h"
 #include <wolfssl/wolfcrypt/sha512.h>
 #undef INLINE
 #include "Tpm.h"

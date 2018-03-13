@@ -46,7 +46,7 @@
 /* USER CODE BEGIN INCLUDE */
 #include <stdint.h>
 #include <time.h>
-#include "main.h"
+#include "StmUtil.h"
 #include "stm32l4xx_hal.h"
 /* USER CODE END INCLUDE */
 
