@@ -29,6 +29,7 @@ SOFTWARE.
 
 /* Includes */
 #include <stdint.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -49,6 +50,8 @@ extern UART_HandleTypeDef huart3;
 /* Variables */
 #undef errno
 extern int32_t errno;
+#define ITMFILENO (4)
+#define ITMCHANNELNO (32)
 
 uint8_t *__env[1] = { 0 };
 uint8_t **environ = __env;
@@ -67,6 +70,12 @@ void SWO_Init(uint32_t portBits, uint32_t cpuCoreFreqHz)
     ITM->TER = portBits; /* ITM Trace Enable Register. Enabled tracing on stimulus ports. One bit per stimulus port. */
     *((volatile unsigned *)(ITM_BASE + 0x01000)) = 0x400003FE; /* DWT_CTRL */
     *((volatile unsigned *)(ITM_BASE + 0x40304)) = 0x00000100; /* Formatter and Flush Control Register */
+}
+
+void ITM_Out(uint32_t port, uint8_t ch)
+{
+    while(ITM->PORT[port].u32 == 0);
+    ITM->PORT[port].u8 = ch;
 }
 #endif
 #endif
@@ -140,9 +149,19 @@ int _write(int32_t file, uint8_t *ptr, int32_t len)
         ENABLE_SWO_TRACE;
         for(uint32_t n = 0; n < len; n++)
         {
-            ITM_SendChar(ptr[n]);
+//            ITM_SendChar(ptr[n]);
+            ITM_Out(0, ptr[n]);
         }
 #endif
+        return len;
+    }
+    else if ((file >= ITMFILENO) && (file < ITMFILENO + ITMCHANNELNO))
+    {
+        ENABLE_SWO_TRACE;
+        for(uint32_t n = 0; n < len; n++)
+        {
+            ITM_Out(file - ITMFILENO, ptr[n]);
+        }
         return len;
     }
 #endif
@@ -168,6 +187,10 @@ void * _sbrk(int32_t incr)
 
 int _close(int32_t file)
 {
+    if ((file >= ITMFILENO) && (file < ITMFILENO + ITMCHANNELNO))
+    {
+        return 0;
+    }
 	errno = ENOSYS;
 	return -1;
 }
@@ -175,18 +198,32 @@ int _close(int32_t file)
 
 int _fstat(int32_t file, struct stat *st)
 {
+    if ((file >= ITMFILENO) && (file < ITMFILENO + ITMCHANNELNO))
+    {
+        st->st_mode = S_IFCHR;
+        st->st_size = 0;
+        return 0;
+    }
 	errno = ENOSYS;
 	return -1;
 }
 
 int _isatty(int32_t file)
 {
+    if ((file >= ITMFILENO) && (file < ITMFILENO + ITMCHANNELNO))
+    {
+        return 1;
+    }
 	errno = ENOSYS;
 	return 0;
 }
 
 int _lseek(int32_t file, int32_t ptr, int32_t dir)
 {
+    if ((file >= ITMFILENO) && (file < ITMFILENO + ITMCHANNELNO))
+    {
+        return 0;
+    }
 	errno = ENOSYS;
 	return -1;
 }
@@ -205,6 +242,16 @@ int _readlink(const char *path, char *buf, size_t bufsize)
 
 int _open(const uint8_t *path, int32_t flags, int32_t mode)
 {
+    unsigned int channel = 0;
+    if((strlen((char*)path) == 7 ) &&
+       !strncmp((char*)path, "ITM[", 4) &&
+       !strcmp((char*)&path[6], "]") &&
+       (sscanf((char*)&path[4],"%02u", &channel) == 1) &&
+       (channel < ITMCHANNELNO) &&
+       ((flags == 0x601) || (flags == 0x10601)))
+    {
+        return ITMFILENO + channel;
+    }
 	errno = ENOSYS;
 	return -1;
 }

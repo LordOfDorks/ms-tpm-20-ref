@@ -145,32 +145,33 @@ bool TpmOperationsLoop(void)
         unsigned int rspLenTPM = sizeof(tpmOp.msgBuf) - sizeof(rspLenTPM);
         unsigned char* rspTPM = (unsigned char*)&tpmOp.msgBuf[sizeof(rspLenTPM)];
 
-        dbgPrintAppend("unsigned char CmdBuf[%d] = {", tpmOp.cmdSize);
+        itmPrintAppend(ITMCMDRSP, "unsigned char CmdBuf[%d] = {", tpmOp.cmdSize);
         for(uint32_t n = 0; n < tpmOp.cmdSize; n++)
         {
-            if(n > 0) dbgPrintAppend(", ");
-            if(!(n % 16)) dbgPrintAppend("\r\n");
-            dbgPrintAppend("0x%02x", tpmOp.msgBuf[n]);
+            if(n > 0) itmPrintAppend(ITMCMDRSP, ", ");
+            if(!(n % 16)) itmPrintAppend(ITMCMDRSP, "\r\n");
+            itmPrintAppend(ITMCMDRSP, "0x%02x", tpmOp.msgBuf[n]);
         }
-        dbgPrintAppend("\r\n};\r\n");
+        itmPrintAppend(ITMCMDRSP, "\r\n};\r\n");
 
         SetDutyCycleIndicator(TRUE);
-        dbgPrint("Execution running...\r\n");
+        dbgPrint("TPM_CC = 0x%01x%02x\r\n", tpmOp.msgBuf[8], tpmOp.msgBuf[9]);
         time_t execStart = time(NULL);
         _plat__RunCommand((unsigned int)tpmOp.cmdSize, (unsigned char*)tpmOp.msgBuf, &rspLenTPM, &rspTPM);
         *((unsigned int*)tpmOp.msgBuf) = rspLenTPM;
         time_t execEnd = time(NULL);
         dbgPrint("Completion time %u'%u\"\r\n", (unsigned int)(execEnd - execStart) / 60, (unsigned int)(execEnd - execStart) % 60);
+        dbgPrint("TPM_RC = 0x%01x%02x\r\n", rspTPM[8], rspTPM[9]);
         SetDutyCycleIndicator(FALSE);
 
-        dbgPrintAppend("unsigned char RspBuf[%d] = {", tpmOp.cmdSize);
+        itmPrintAppend(ITMCMDRSP, "unsigned char RspBuf[%d] = {", tpmOp.cmdSize);
         for(uint32_t n = 0; n < rspLenTPM; n++)
         {
-            if(n > 0) dbgPrintAppend(", ");
-            if(!(n % 16)) dbgPrintAppend("\r\n");
-            dbgPrintAppend("0x%02x", rspTPM[n]);
+            if(n > 0) itmPrintAppend(ITMCMDRSP, ", ");
+            if(!(n % 16)) itmPrintAppend(ITMCMDRSP, "\r\n");
+            itmPrintAppend(ITMCMDRSP, "0x%02x", rspTPM[n]);
         }
-        dbgPrintAppend("\r\n};\r\n");
+        itmPrintAppend(ITMCMDRSP, "\r\n};\r\n");
 
         tpmOp.rspSize = sizeof(rspLenTPM) + rspLenTPM;
         tpmOp.cmdSize = 0;
@@ -189,9 +190,9 @@ bool TpmOperationsLoop(void)
             {
                 chunk = MIN(16, tpmOp.rspSize - n);
                 while(CDC_Transmit_FS((unsigned char*)&tpmOp.msgBuf[n], chunk) != 0);
-                dbgPrint("Sent(%u)\r\n", (unsigned int)(n + chunk));
+//                dbgPrint("Sent(%u)\r\n", (unsigned int)(n + chunk));
             }
-            dbgPrint("Response(%d)\r\n", tpmOp.rspSize);
+            itmPrintAppend(ITMSIGNAL, "Response(%d)\r\n", tpmOp.rspSize);
         }
     }
 
@@ -213,16 +214,17 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
     {
         memcpy((void*)&tpmOp.msgBuf[tpmOp.cmdSize], (void*)Buf, *Len);
         tpmOp.cmdSize += *Len;
-        dbgPrint("Received(%d)\r\n", tpmOp.cmdSize);
+//        itmPrintAppend(ITMSIGNAL, "Received(%d)\r\n", tpmOp.cmdSize);
         if(tpmOp.cmdSize >= tpmOp.receivingCmd)
         {
+            itmPrintAppend(ITMSIGNAL, "Received(%d)\r\n", tpmOp.cmdSize);
             tpmOp.receivingCmd = -1;
             tpmOp.flags.executionRequested = 1;
         }
     }
     else if(sizeof(signalWrapper_t) > *Len)
     {
-        logError("Invalid frame received.\r\n");
+        itmPrintAppend(ITMSIGNAL, "Invalid frame received.\r\n");
         return false;
     }
     else
@@ -236,60 +238,60 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                 case SignalNothing:
                     if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
                     {
-                        logError("Invalid data size %u for SignalNothing(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        itmPrintAppend(ITMSIGNAL, "Invalid data size %u for SignalNothing(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
                         return false;
                     }
-                    dbgPrint("SignalNothing\r\n");
+                    itmPrintAppend(ITMSIGNAL, "SignalNothing\r\n");
                     break;
 
                 case SignalShutdown:
                     if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
                     {
-                        logError("Invalid data size %u for SignalShutdown(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        itmPrintAppend(ITMSIGNAL, "Invalid data size %u for SignalShutdown(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
                         return false;
                     }
-                    dbgPrint("SignalShutdown\r\n");
+                    itmPrintAppend(ITMSIGNAL, "SignalShutdown\r\n");
                     tpmOp.flags.powerOffRequested = 1;
                     break;
 
                 case SignalReset:
                     if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
                     {
-                        logError("Invalid data size %u for SignalReset(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        itmPrintAppend(ITMSIGNAL, "Invalid data size %u for SignalReset(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
                         return false;
                     }
-                    dbgPrint("SignalReset\r\n");
+                    itmPrintAppend(ITMSIGNAL, "SignalReset\r\n");
                     tpmOp.flags.resetRequested = 1;
                     break;
 
                 case SignalSetClock:
                     if((sig->s.dataSize != sizeof(unsigned int)) || (*Len != sizeof(signalWrapper_t) + sizeof(unsigned int)))
                     {
-                        logError("Invalid data size %u for SignalSetClock(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        itmPrintAppend(ITMSIGNAL, "Invalid data size %u for SignalSetClock(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
                         return false;
                     }
                     payload = (pSignalPayload_t)&Buf[sizeof(signalWrapper_t)];
                     SetRealTimeClock(payload->SignalSetClockPayload.time);
-                    dbgPrint("SignalSetClock(0x%08x)\r\n", payload->SignalSetClockPayload.time);
+                    itmPrintAppend(ITMSIGNAL, "SignalSetClock(0x%08x)\r\n", payload->SignalSetClockPayload.time);
                     break;
 
                 case SignalCancelOn:
                     if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
                     {
-                        logError("Invalid data size %u for SignalCancelOn(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        itmPrintAppend(ITMSIGNAL, "Invalid data size %u for SignalCancelOn(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
                         return false;
                     }
-                    dbgPrint("SignalCancelOn\r\n");
+                    itmPrintAppend(ITMSIGNAL, "SignalCancelOn\r\n");
                     _plat__SetCancel();
                     break;
 
                 case SignalCancelOff:
                     if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
                     {
-                        logError("Invalid data size %u for SignalCancelOff(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        itmPrintAppend(ITMSIGNAL, "Invalid data size %u for SignalCancelOff(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
                         return false;
                     }
-                    dbgPrint("SignalCancelOff\r\n");
+                    itmPrintAppend(ITMSIGNAL, "SignalCancelOff\r\n");
                     _plat__ClearCancel();
                     break;
 
@@ -297,7 +299,7 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                     if((sig->s.dataSize == 0) ||
                        (*Len == sizeof(signalWrapper_t)))
                     {
-                        logError("Invalid data size %u for SignalCommand(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        itmPrintAppend(ITMSIGNAL, "Invalid data size %u for SignalCommand(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
                         return false;
                     }
                     payload = (pSignalPayload_t)&Buf[sizeof(signalWrapper_t)];
@@ -305,13 +307,13 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                     unsigned int maxAllowed = sizeof(tpmOp.msgBuf);
                     memset((unsigned char*)tpmOp.msgBuf, 0x00, sizeof(tpmOp.msgBuf));
                     tpmOp.rspSize = 0;
-                    dbgPrint("SignalCommand(%d)\r\n", payload->SignalCommandPayload.cmdSize);
+                    itmPrintAppend(ITMSIGNAL, "SignalCommand(%d)\r\n", payload->SignalCommandPayload.cmdSize);
 
                     // Set the locality for the command
                     if(_plat__LocalityGet() != payload->SignalCommandPayload.locality)
                     {
                         _plat__LocalitySet(payload->SignalCommandPayload.locality);
-                        dbgPrint("SetLocality(%d)\r\n", payload->SignalCommandPayload.locality);
+                        itmPrintAppend(ITMSIGNAL, "SetLocality(%d)\r\n", payload->SignalCommandPayload.locality);
                     }
 
                     if((*Len == expected) &&
@@ -320,7 +322,7 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                         memcpy((void*)tpmOp.msgBuf, (void*)payload->SignalCommandPayload.cmd, payload->SignalCommandPayload.cmdSize);
                         tpmOp.cmdSize = payload->SignalCommandPayload.cmdSize;
                         tpmOp.flags.executionRequested = 1;
-                        dbgPrint("Received(%d)\r\n", tpmOp.cmdSize);
+//                        itmPrintAppend(ITMSIGNAL, "Received(%d)\r\n", tpmOp.cmdSize);
                     }
                     else if((*Len < expected) &&
                             (payload->SignalCommandPayload.cmdSize <= maxAllowed))
@@ -329,7 +331,7 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                         memcpy((void*)tpmOp.msgBuf, (void*)payload->SignalCommandPayload.cmd, dataSnip);
                         tpmOp.receivingCmd = payload->SignalCommandPayload.cmdSize;
                         tpmOp.cmdSize = dataSnip;
-                        dbgPrint("Received(%d)\r\n", tpmOp.cmdSize);
+//                        itmPrintAppend(ITMSIGNAL, "Received(%d)\r\n", tpmOp.cmdSize);
                     }
                     else
                     {
@@ -341,10 +343,10 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                 case SignalResponse:
                     if((sig->s.dataSize != 0) || (*Len != sizeof(signalWrapper_t)))
                     {
-                        logError("Invalid data size %u for SignalResponse(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
+                        itmPrintAppend(ITMSIGNAL, "Invalid data size %u for SignalResponse(%u).\r\n", (unsigned int)*Len, (unsigned int)sig->s.dataSize);
                         return false;
                     }
-                    dbgPrint("SignalResponse\r\n");
+                    itmPrintAppend(ITMSIGNAL, "SignalResponse\r\n");
                     if(tpmOp.rspSize > 0)
                     {
                         tpmOp.flags.responseRequested = 1;
@@ -352,7 +354,7 @@ bool TpmSignalEvent(uint8_t* Buf, uint32_t *Len)
                     break;
 
                 default:
-                    logError("Unknown Signal %u received.\r\n", sig->s.signal);
+                    itmPrintAppend(ITMSIGNAL, "Unknown Signal %u received.\r\n", sig->s.signal);
                     return false;
                     break;
             }
