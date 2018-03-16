@@ -34,8 +34,8 @@ ENTRY(Reset_Handler)
 /* Highest address of the user mode stack */
 _estack = 0x20018000;    /* end of RAM */
 /* Generate a link error if heap and stack don't fit into RAM */
-_Min_Heap_Size = 0x4000;      /* required amount of heap  */
-_Min_Stack_Size = 0x4000; /* required amount of stack */
+_Min_Heap_Size = 0x200;      /* required amount of heap  */
+_Min_Stack_Size = 0xF000; /* required amount of stack */
 
 /* Specify the memory areas */
 MEMORY
@@ -145,6 +145,24 @@ SECTIONS
 
   
   /* Uninitialized data section */
+   .bss2 :
+  {
+    . = ALIGN(4);
+    *(.ram2)
+    *(.ram2*)
+    Middlewares\Platform\src\Cancel.o
+    Middlewares\Platform\src\Clock.o
+    Middlewares\Platform\src\Entropy.o
+/*    Middlewares\Platform\src\LocalityPlat.o*/
+/*    Middlewares\Platform\src\NVMem.o*/
+    Middlewares\Platform\src\PlatformData.o
+/*    Middlewares\Platform\src\PowerPlat.o*/
+/*    Middlewares\Platform\src\PPPlat.o*/
+/*    Middlewares\Platform\src\RunCommand.o*/
+/*    Middlewares\Platform\src\Unique.o*/
+    . = ALIGN(4);
+  } >RAM2
+  
   . = ALIGN(4);
   .bss :
   {

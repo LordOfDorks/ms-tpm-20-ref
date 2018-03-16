@@ -125,7 +125,7 @@ int main(void)
   fprintf(stderr, "\r\n\r\n=========================\r\n"
                           "= Nucleo-L476RG TPM 2.0 =\r\n"
                           "=========================\r\n");
-  for(uint32_t n = 1; n < ITMCHANNELS; n++)
+  for(uint32_t n = 0; n < ITMCHANNELS; n++)
   {
       char fileName[10];
       sprintf(fileName, "ITM[%02u]", (unsigned int)n);
