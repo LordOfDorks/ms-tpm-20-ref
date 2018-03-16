@@ -16,6 +16,8 @@ typedef unsigned char DEVICE_UNIQUE_ID_T[12];
 #define DEVICE_REV (*(uint16_t *) (DBGMCU->IDCODE >> 16))
 char logStampStr[40] = {0};
 
+void* g_itm[ITMCHANNELS] = {0};
+
 GPIO_PinState BlueButtonLast = GPIO_PIN_SET;
 int BlueButtonTransitionDetected(void)
 {
@@ -34,6 +36,16 @@ int BlueButtonTransitionDetected(void)
     }
     // No change
     return 0;
+}
+
+void InitializeITM()
+{
+    for(uint32_t n = 1; n < ITMCHANNELS; n++)
+    {
+        char fileName[10];
+        sprintf(fileName, "ITM[%02u]", (unsigned int)n);
+        g_itm[n] = (void*)fopen(fileName, "wb");
+    }
 }
 
 void SetDutyCycleIndicator(bool on)

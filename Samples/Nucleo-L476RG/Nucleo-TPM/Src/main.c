@@ -85,7 +85,7 @@ static void MX_USART3_UART_Init(void);
 /* Private function prototypes -----------------------------------------------*/
 
 /* USER CODE END PFP */
-void* g_itm[ITMCHANNELS] = {0};
+
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
@@ -125,12 +125,7 @@ int main(void)
   fprintf(stderr, "\r\n\r\n=========================\r\n"
                           "= Nucleo-L476RG TPM 2.0 =\r\n"
                           "=========================\r\n");
-  for(uint32_t n = 0; n < ITMCHANNELS; n++)
-  {
-      char fileName[10];
-      sprintf(fileName, "ITM[%02u]", (unsigned int)n);
-      g_itm[n] = (void*)fopen(fileName, "wb");
-  }
+  InitializeITM();
   /* USER CODE END 2 */
   if(!TpmInitializeDevice())
   {
