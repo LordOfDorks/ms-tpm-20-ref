@@ -56,7 +56,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
-void _Error_Handler(char * file, int line, const char * func);
+void _Error_Handler(char * file, int line);
 
 /* USER CODE BEGIN 0 */
 /* USER CODE END 0 */
@@ -338,7 +338,7 @@ USBD_StatusTypeDef  USBD_LL_Init (USBD_HandleTypeDef *pdev)
   hpcd_USB_OTG_FS.Init.vbus_sensing_enable = DISABLE;
   if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK)
   {
-    _Error_Handler(__FILE__, __LINE__, __FUNCTION__);
+    _Error_Handler(__FILE__, __LINE__);
   }
 
   HAL_PCDEx_SetRxFiFo(&hpcd_USB_OTG_FS, 0x80);

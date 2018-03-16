@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
 	<name>Nucleo-L476RG</name>
-	<comment></comment>
+	<comment />
 	<projects>
 	</projects>
 	<buildSpec>
@@ -15,7 +15,7 @@
 				</dictionary>
 				<dictionary>
 					<key>?name?</key>
-					<value></value>
+					<value />
 				</dictionary>
 				<dictionary>
 					<key>org.eclipse.cdt.make.core.append_environment</key>
@@ -23,7 +23,7 @@
 				</dictionary>
 				<dictionary>
 					<key>org.eclipse.cdt.make.core.buildArguments</key>
-					<value></value>
+					<value />
 				</dictionary>
 				<dictionary>
 					<key>org.eclipse.cdt.make.core.buildCommand</key>
@@ -74,7 +74,7 @@
 		<link>
 			<name>Middlewares/TPMCmd</name>
 			<type>2</type>
-			<locationURI>PARENT-3-PROJECT_LOC/TPMCmd/tpm/src</locationURI>
+			<location>PARENT-3-PROJECT_LOC/TPMCmd/tpm/src</location>
 		</link>
 		<link>
 			<name>Middlewares/WolfCypt</name>
@@ -84,47 +84,47 @@
 		<link>
 			<name>Middlewares/WolfCypt/aes.c</name>
 			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/aes.c</locationURI>
+			<location>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/aes.c</location>
 		</link>
 		<link>
 			<name>Middlewares/WolfCypt/ecc.c</name>
 			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/ecc.c</locationURI>
+			<location>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/ecc.c</location>
 		</link>
 		<link>
 			<name>Middlewares/WolfCypt/integer.c</name>
 			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/integer.c</locationURI>
+			<location>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/integer.c</location>
 		</link>
 		<link>
 			<name>Middlewares/WolfCypt/memory.c</name>
 			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/memory.c</locationURI>
+			<location>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/memory.c</location>
 		</link>
 		<link>
 			<name>Middlewares/WolfCypt/sha.c</name>
 			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/sha.c</locationURI>
+			<location>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/sha.c</location>
 		</link>
 		<link>
 			<name>Middlewares/WolfCypt/sha256.c</name>
 			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/sha256.c</locationURI>
+			<location>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/sha256.c</location>
 		</link>
 		<link>
 			<name>Middlewares/WolfCypt/sha512.c</name>
 			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/sha512.c</locationURI>
+			<location>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/sha512.c</location>
 		</link>
 		<link>
 			<name>Middlewares/WolfCypt/tfm.c</name>
 			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/tfm.c</locationURI>
+			<location>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/tfm.c</location>
 		</link>
 		<link>
 			<name>Middlewares/WolfCypt/wolfmath.c</name>
 			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/wolfmath.c</locationURI>
+			<location>PARENT-3-PROJECT_LOC/external/wolfssl/wolfcrypt/src/wolfmath.c</location>
 		</link>
 	</linkedResources>
 </projectDescription>
