@@ -122,10 +122,11 @@ int main(void)
   MX_USB_DEVICE_Init();
 
   /* USER CODE BEGIN 2 */
+  InitializeITM();
   fprintf(stderr, "\r\n\r\n=========================\r\n"
                           "= Nucleo-L476RG TPM 2.0 =\r\n"
                           "=========================\r\n");
-  InitializeITM();
+
   /* USER CODE END 2 */
   if(!TpmInitializeDevice())
   {

@@ -38,15 +38,31 @@ int BlueButtonTransitionDetected(void)
     return 0;
 }
 
+#ifndef NDEBUG
+#define ITM_PORT_BITS (0xffffffff)
 void InitializeITM()
 {
-    for(uint32_t n = 1; n < ITMCHANNELS; n++)
+//    CoreDebug->DEMCR = CoreDebug_DEMCR_TRCENA_Msk; /* enable trace in core debug */
+//    ITM->TCR = ITM_TCR_TraceBusID_Msk | ITM_TCR_SWOENA_Msk | ITM_TCR_SYNCENA_Msk | ITM_TCR_ITMENA_Msk; /* ITM Trace Control Register */
+//    ITM->TPR = ITM_TPR_PRIVMASK_Msk; /* ITM Trace Privilege Register */
+//    ITM->TER = ITM_PORT_BITS; /* ITM Trace Enable Register. Enabled tracing on stimulus ports. One bit per stimulus port. */
+//    *((volatile unsigned *)(ITM_BASE + 0x01000)) = 0x400003FE; /* DWT_CTRL */
+//    *((volatile unsigned *)(ITM_BASE + 0x40304)) = 0x00000100; /* Formatter and Flush Control Register */
+
+    for(uint32_t n = 0; n < ITMCHANNELS; n++)
     {
         char fileName[10];
         sprintf(fileName, "ITM[%02u]", (unsigned int)n);
         g_itm[n] = (void*)fopen(fileName, "wb");
     }
 }
+
+void ITM_Out(uint32_t port, uint8_t ch)
+{
+    while(ITM->PORT[port].u32 == 0);
+    ITM->PORT[port].u8 = ch;
+}
+#endif
 
 void SetDutyCycleIndicator(bool on)
 {

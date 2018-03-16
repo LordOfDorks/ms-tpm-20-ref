@@ -39,46 +39,17 @@ SOFTWARE.
 #include <sys/time.h>
 #include <sys/times.h>
 #include "stm32l4xx_hal.h"
-#include "core_cm4.h"
+#include "StmUtil.h"
 
-extern RNG_HandleTypeDef hrng;
 extern RTC_HandleTypeDef hrtc;
-extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart2;
-extern UART_HandleTypeDef huart3;
 
 /* Variables */
 #undef errno
 extern int32_t errno;
-#define ITMFILENO (4)
-#define ITMCHANNELNO (32)
 
 uint8_t *__env[1] = { 0 };
 uint8_t **environ = __env;
-
-#ifndef NDEBUG
-#ifdef SERIALDEBUGPRINT
-extern UART_HandleTypeDef huart2;
-#else
-#define CPU_CORE_FREQUENCY_HZ 800000000 /* CPU core frequency in Hz */
-#define ENABLE_SWO_TRACE if(CoreDebug->DEMCR != CoreDebug_DEMCR_TRCENA_Msk) {SWO_Init(1, CPU_CORE_FREQUENCY_HZ);}
-void SWO_Init(uint32_t portBits, uint32_t cpuCoreFreqHz)
-{
-    CoreDebug->DEMCR = CoreDebug_DEMCR_TRCENA_Msk; /* enable trace in core debug */
-    ITM->TCR = ITM_TCR_TraceBusID_Msk | ITM_TCR_SWOENA_Msk | ITM_TCR_SYNCENA_Msk | ITM_TCR_ITMENA_Msk; /* ITM Trace Control Register */
-    ITM->TPR = ITM_TPR_PRIVMASK_Msk; /* ITM Trace Privilege Register */
-    ITM->TER = portBits; /* ITM Trace Enable Register. Enabled tracing on stimulus ports. One bit per stimulus port. */
-    *((volatile unsigned *)(ITM_BASE + 0x01000)) = 0x400003FE; /* DWT_CTRL */
-    *((volatile unsigned *)(ITM_BASE + 0x40304)) = 0x00000100; /* Formatter and Flush Control Register */
-}
-
-void ITM_Out(uint32_t port, uint8_t ch)
-{
-    while(ITM->PORT[port].u32 == 0);
-    ITM->PORT[port].u8 = ch;
-}
-#endif
-#endif
 
 /* Functions */
 void initialise_monitor_handles()
@@ -141,23 +112,20 @@ void _exit(int32_t status)
 int _write(int32_t file, uint8_t *ptr, int32_t len)
 {
 #ifndef NDEBUG
-    if (file == 2) //STDERR
+    if (file == 1) //STDOUT
     {
-#ifdef SERIALDEBUGPRINT
         HAL_UART_Transmit(&huart2, ptr, len, HAL_MAX_DELAY);
-#else
-        ENABLE_SWO_TRACE;
+    }
+    else if (file == 2) //STDERR
+    {
         for(uint32_t n = 0; n < len; n++)
         {
-//            ITM_SendChar(ptr[n]);
-            ITM_Out(0, ptr[n]);
+            ITM_SendChar(ptr[n]);
         }
-#endif
         return len;
     }
     else if ((file >= ITMFILENO) && (file < ITMFILENO + ITMCHANNELNO))
     {
-        ENABLE_SWO_TRACE;
         for(uint32_t n = 0; n < len; n++)
         {
             ITM_Out(file - ITMFILENO, ptr[n]);

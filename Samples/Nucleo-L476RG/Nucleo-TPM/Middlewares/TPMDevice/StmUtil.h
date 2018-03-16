@@ -19,6 +19,10 @@
 extern char logStampStr[40];
 extern void* g_itm[ITMCHANNELS];
 
+#define ITMFILENO (4)
+#define ITMCHANNELNO (32)
+void ITM_Out(uint32_t port, uint8_t ch);
+
 char* GetLogStamp(void);
 int BlueButtonTransitionDetected(void);
 void SetDutyCycleIndicator(bool on);
