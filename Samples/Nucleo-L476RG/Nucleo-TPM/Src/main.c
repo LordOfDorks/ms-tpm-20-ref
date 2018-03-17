@@ -1,7 +1,8 @@
+
 /**
   ******************************************************************************
-  * File Name          : main.c
-  * Description        : Main program body
+  * @file           : main.c
+  * @brief          : Main program body
   ******************************************************************************
   * This notice applies to any and all portions of this file
   * that are not between comment pairs USER CODE BEGIN and
@@ -45,7 +46,6 @@
   *
   ******************************************************************************
   */
-
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32l4xx_hal.h"
@@ -88,9 +88,13 @@ static void MX_USART2_UART_Init(void);
 
 /* USER CODE END 0 */
 
+/**
+  * @brief  The application entry point.
+  *
+  * @retval None
+  */
 int main(void)
 {
-
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -117,7 +121,6 @@ int main(void)
   MX_RTC_Init();
   MX_USART2_UART_Init();
   MX_USB_DEVICE_Init();
-
   /* USER CODE BEGIN 2 */
   InitializeITM();
   fprintf(stderr, "\r\n\r\n=========================\r\n"
@@ -149,8 +152,10 @@ int main(void)
 
 }
 
-/** System Clock Configuration
-*/
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
 void SystemClock_Config(void)
 {
 
@@ -160,6 +165,8 @@ void SystemClock_Config(void)
 
     /**Configure LSE Drive Capability 
     */
+  HAL_PWR_EnableBkUpAccess();
+
   __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
 
     /**Initializes the CPU, AHB and APB busses clocks 
@@ -174,7 +181,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_11;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLM = 1;
+  RCC_OscInitStruct.PLL.PLLM = 1;  // <-- This one gets dropped by V1.11.0 add me manually back in when CubeMX ran
   RCC_OscInitStruct.PLL.PLLN = 10;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
   RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
@@ -193,7 +200,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -254,6 +261,7 @@ static void MX_RTC_Init(void)
     /**Initialize RTC Only 
     */
   hrtc.Instance = RTC;
+if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != 0x32F2){
   hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
   hrtc.Init.AsynchPrediv = 127;
   hrtc.Init.SynchPrediv = 255;
@@ -268,7 +276,6 @@ static void MX_RTC_Init(void)
 
     /**Initialize RTC and set the Time and Date 
     */
-  if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != 0x32F2){
   sTime.Hours = 0;
   sTime.Minutes = 0;
   sTime.Seconds = 0;
@@ -357,10 +364,11 @@ static void MX_GPIO_Init(void)
 
 /**
   * @brief  This function is executed in case of error occurrence.
-  * @param  None
+  * @param  file: The file name as string.
+  * @param  line: The line in file as a number.
   * @retval None
   */
-void _Error_Handler(char * file, int line)
+void _Error_Handler(char *file, int line)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
     dbgPrint("PANIC: EXECUTION HALTED %s@%d\r\n", file, line);
@@ -368,35 +376,32 @@ void _Error_Handler(char * file, int line)
   while(1)
   {
   }
-  /* USER CODE END Error_Handler_Debug */ 
+  /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef USE_FULL_ASSERT
-
+#ifdef  USE_FULL_ASSERT
 /**
-   * @brief Reports the name of the source file and the source line number
-   * where the assert_param error has occurred.
-   * @param file: pointer to the source file name
-   * @param line: assert_param error line source number
-   * @retval None
-   */
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
 void assert_failed(uint8_t* file, uint32_t line)
-{
+{ 
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
-
 }
-
-#endif
-
-/**
-  * @}
-  */ 
+#endif /* USE_FULL_ASSERT */
 
 /**
   * @}
-*/ 
+  */
+
+/**
+  * @}
+  */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
